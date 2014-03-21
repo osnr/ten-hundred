@@ -1,0 +1,28 @@
+.definition {
+    position: relative;
+    width: 500px;
+    height: 300px;
+}
+.definition > .bg, .definition > .edit {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+
+    font-family: sans-serif;
+    font-size: 13px;
+
+    padding: 2px;
+    margin: 0;
+    border: 1px solid black;
+}
+.definition > .bg {
+    color: rgba(0,0,0,0);
+    overflow-wrap: break-word;
+}
+.definition > .edit {
+    background-color: rgba(0,0,0,0);
+}
+
+.uncommon {
+    background-color: red;
+}
