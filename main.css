@@ -4,6 +4,8 @@
     height: 300px;
 }
 .definition > .bg, .definition > .edit {
+    box-sizing: border-box;
+
     position: absolute;
     width: 100%;
     height: 100%;
