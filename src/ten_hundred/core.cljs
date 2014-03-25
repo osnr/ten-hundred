@@ -83,11 +83,23 @@
 
 (def app-state
   (atom [[(assoc (empty-definition)
-            :term "c"
-            :meaning "the cool")]
+            :term "score"
+            :meaning "five times four")
+          (assoc (empty-definition)
+            :term "continent"
+            :meaning "big piece of land")
+          (assoc (empty-definition)
+            :term "nation"
+            :meaning "a people")
+          (assoc (empty-definition)
+            :term "conceived"
+            :meaning "made up")
+          (assoc (empty-definition)
+            :term "proposition"
+            :meaning "an idea that could be right or wrong")]
          [(assoc (empty-definition)
-            :term "d"
-            :meaning "heh c")]]))
+            :term "Gettysburg"
+            :meaning "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.")]]))
 
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
@@ -108,20 +120,22 @@
                                    (.focus)))
             (recur))))))
     om/IRenderState
-    (render-state [this state]
-                  (println "rerendering" definition)
+    (render-state [this {:keys [terms delete-definition]}]
       (dom/div #js {:className "definition"
                     :ref (:term definition)}
         (dom/input #js {:type "text" :placeholder "Term"
                         :className "term"
                         :value (:term definition)
                         :onChange #(handle-term-change % definition)})
+        (dom/button #js {:className "remove"
+                         :onClick #(put! delete-definition @definition)}
+                    "x")
         (dom/div #js {:className "meaning"}
           (dom/textarea #js {:className "edit"
                              :value (:meaning definition)
                              :onChange #(handle-meaning-change % definition)})
           (apply dom/pre #js {:className "bg"}
-            (colorize (:terms state)
+            (colorize terms
                       (:meaning definition))))))))
 
 (defn add-definition [level]
@@ -129,20 +143,34 @@
 
 (defn level-view [level owner]
   (reify
+    om/IInitState
+    (init-state [_]
+      {:delete-definition (chan)})
+    om/IWillMount
+    (will-mount [_]
+      (let [delete-definition (om/get-state owner :delete-definition)]
+        (go (loop []
+          (let [definition (<! delete-definition)]
+            (om/transact! level
+              (fn [level] (vec (remove #(= definition %) level))))
+            (recur))))))
     om/IRenderState
-    (render-state [this state]
+    (render-state [this {:keys [delete-level terms delete-definition]}]
       (dom/div #js {:className "level"}
         (apply dom/div nil
           (om/build-all definition-view level
-                        {:state state}))
-        (dom/button #js {:onClick #(add-definition level)} "+def")))))
+                        {:init-state {:delete-definition delete-definition}
+                         :state {:terms terms}}))
+        (dom/button #js {:onClick #(add-definition level)} "+def")
+        (dom/button #js {:className "deleteLevel"
+                         :onClick #(put! delete-level @level)} "x")))))
 
 (defn find-terms [levels]
   (apply concat
     (map-indexed
      (fn [idx level]
        (map #(hash-map :uuid (:uuid %)
-                       :term (:term %)
+                       :term (string/lower-case (:term %))
                        :level idx
                        :chan (:chan %))
             (remove #(empty? (:term %)) level)))
@@ -151,17 +179,29 @@
 (defn add-level [app]
   (om/transact! app #(conj % [(empty-definition)])))
 
-(defn build-level [app level]
+(defn build-level [app delete-level level]
   (om/build level-view level
-            {:state {:terms (find-terms (take-while #(not= % level) app))}}))
+            {:init-state {:delete-level delete-level}
+             :state {:terms (find-terms (take-while #(not= % level) app))}}))
 
 (defn app-view [app owner]
   (reify
-    om/IRender
-    (render [this]
+    om/IInitState
+    (init-state [_]
+      {:delete-level (chan)})
+    om/IWillMount
+    (will-mount [_]
+      (let [delete-level (om/get-state owner :delete-level)]
+        (go (loop []
+          (let [level (<! delete-level)]
+            (om/transact! app
+              (fn [levels] (vec (remove #(= level %) levels))))
+            (recur))))))
+    om/IRenderState
+    (render-state [this {:keys [delete-level]}]
       (apply dom/div #js {:className "app"}
-        (conj (mapv #(build-level app %) app)
-              (dom/button #js {:className "add-level"
+        (conj (mapv #(build-level app delete-level %) app)
+              (dom/button #js {:className "addLevel"
                                :onClick #(add-level app)}
                           "+level")
               (dom/div #js {:className "graph"}

@@ -2,7 +2,7 @@ body {
   white-space: nowrap;
 }
 
-.add-level {
+.addLevel {
 
 }
 
@@ -12,6 +12,10 @@ body {
   display: inline-block;
   margin-right: 2em;
 }
+.deleteLevel {
+  width: 25px;
+  float: right;
+}
 
 .definition {
   padding-top: 1em;
@@ -20,12 +24,16 @@ body {
 }
 
 .term {
-  width: 100%;
+  width: 375px;
+}
+.delete {
+  width: 20px;
+  float: right;
 }
 .meaning {
   position: relative;
   width: 400px;
-  height: 250px;
+  height: 150px;
 }
 .meaning > .bg, .meaning > .edit {
   box-sizing: border-box;
