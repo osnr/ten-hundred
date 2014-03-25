@@ -7,20 +7,25 @@ body {
 }
 
 .level {
+  background-color: rgba(128, 128, 128, 0.2);
   vertical-align: top;
   display: inline-block;
   margin-right: 2em;
-  background-color: rgba(128, 128, 128, 0.1);
 }
 
 .definition {
-  background-color: rgba(128, 128, 128, 0.2);
+  padding-top: 1em;
+  padding-left: 1em;
+  padding-right: 1em;
 }
 
+.term {
+  width: 100%;
+}
 .meaning {
   position: relative;
   width: 400px;
-  height: 300px;
+  height: 250px;
 }
 .meaning > .bg, .meaning > .edit {
   box-sizing: border-box;
@@ -51,14 +56,37 @@ body {
   user-select: none;
 }
 .meaning > .edit {
-  background-color: rgba(0,0,0,0);
+
 }
 
-.term {
+.defined {
   background-color: rgba(0,0,255,0.5);
   pointer-events: auto;
   cursor: pointer;
 }
 .uncommon {
   background-color: rgba(255,0,0,0.5);
+}
+
+.graph {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  background-color: rgba(128,128,128,0.1);
+}
+.graph svg {
+  padding: 10px;
+}
+.nodeRect {
+  fill: white;
+  stroke: #8888a5;
+}
+.nodeLabel {
+  font-family: sans-serif;
+  font-size: 12px;
+  alignment-baseline: middle;
+}
+.dep {
+  stroke: #3465a4;
+  fill: rgba(0, 0, 0, 0);
 }
