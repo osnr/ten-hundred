@@ -47,7 +47,7 @@ body {
 
   padding: 2px;
   margin: 0;
-  border: 1px solid black;
+  border: 1px solid #aaa;
 }
 .meaning > .bg {
   color: rgba(0,0,0,0);
