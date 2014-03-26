@@ -10,45 +10,64 @@
 
 (enable-console-print!)
 
+(defn handle-node-click [focus]
+  (put! focus :focus)
+  false)
+
 (defn render-node [g n value]
   (let [node (.node g n)
         x (.-x value)
         y (.-y value)
         width (.-width value)
-        height (.-height value)]
+        height (.-height value)
+
+        label (.-label node)
+        focus (.-focus node)]
     (dom/g #js {:transform (str "translate(" (- x (/ width 2))
                                 "," (- y (/ height 2)) ")")}
            (dom/rect #js {:className "nodeRect"
+                          :onClick #(handle-node-click focus)
                           :width width
                           :height height})
            (dom/text #js {:className "nodeLabel"
                           :textAnchor "middle"
                           :x (/ width 2)
                           :y (/ height 2)}
-                     (.-label node)))))
+                     label))))
 
 (defn render-edge [layout e]
   (dom/path #js {:className "dep"
                  :d (graph/points->svg-path
                      (graph/calc-points layout e))}))
 
-(defn render-graph [terms levels]
-  (let [g (->> levels
-               (graph/adjacency-list terms)
-               (graph/graph))
-        layout (graph/layout g)
-        value (.-_value layout)]
-    (dom/svg #js {:width (.-width value)
-                  :height (.-height value)}
-      (apply dom/g #js {:className "nodes"}
-             (map #(render-node g % (.node layout %))
-                  (.nodes layout)))
-      (apply dom/g #js {:className "edges"}
-        (map #(render-edge layout %)
-             (.edges layout))))))
+(defn render-graph [graph-state terms levels]
+  (println graph-state)
+  (when (not= graph-state :hide)
+    (let [g (->> levels
+                 (graph/adjacency-list terms)
+                 (graph/graph))
+          layout (graph/layout g)
+          value (.-_value layout)
+
+          width (.-width value)
+          height (.-height value)]
+      (dom/svg (if (= graph-state :fullscreen)
+                 #js {:width width
+                      :height height}
+                 #js {:width width
+                      :height 250
+                      :viewBox (str "0 0 "
+                                    width " "
+                                    height)})
+        (apply dom/g #js {:className "nodes"}
+          (map #(render-node g % (.node layout %))
+               (.nodes layout)))
+        (apply dom/g #js {:className "edges"}
+          (map #(render-edge layout %)
+               (.edges layout)))))))
 
 (defn handle-term-click [term-state]
-  (put! (:chan term-state) :focus))
+  (put! (:focus term-state) :focus))
 
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
@@ -76,7 +95,7 @@
   {:uuid (uuid/uuid-string (uuid/make-random-uuid))
    :term ""
    :meaning ""
-   :chan (chan)})
+   :focus (chan)})
 
 ;; (def app-state
 ;;   (atom [[(empty-definition)]]))
@@ -111,9 +130,9 @@
   (reify
     om/IWillMount
     (will-mount [_]
-      (let [term-chan (:chan definition)]
+      (let [focus (:focus definition)]
         (go (loop []
-          (let [e (<! term-chan)]
+          (let [e (<! focus)]
             (cond (= e :focus) (-> (om/get-node owner)
                                    (.getElementsByClassName "edit")
                                    (aget 0)
@@ -172,7 +191,7 @@
        (map #(hash-map :uuid (:uuid %)
                        :term (string/lower-case (:term %))
                        :level idx
-                       :chan (:chan %))
+                       :focus (:focus %))
             (remove #(empty? (:term %)) level)))
      levels)))
 
@@ -184,11 +203,27 @@
             {:init-state {:delete-level delete-level}
              :state {:terms (find-terms (take-while #(not= % level) app))}}))
 
+(defn handle-fullscreen-graph [owner graph-state]
+  (om/set-state! owner :graph-state
+    (case graph-state
+      :show :fullscreen
+      :hide :show
+      :fullscreen :show)))
+
+(defn handle-hide-show-graph [owner graph-state]
+  (om/set-state! owner :graph-state
+    (case graph-state
+      :show :hide
+      :fullscreen :hide
+      :hide :show))
+  false)
+
 (defn app-view [app owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:delete-level (chan)})
+      {:graph-state :show
+       :delete-level (chan)})
     om/IWillMount
     (will-mount [_]
       (let [delete-level (om/get-state owner :delete-level)]
@@ -198,14 +233,23 @@
               (fn [levels] (vec (remove #(= level %) levels))))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [delete-level]}]
+    (render-state [this {:keys [delete-level graph-state]}]
       (apply dom/div #js {:className "app"}
         (conj (mapv #(build-level app delete-level %) app)
               (dom/button #js {:className "addLevel"
                                :onClick #(add-level app)}
                           "+level")
-              (dom/div #js {:className "graph"}
-                (render-graph (find-terms app) app)))))))
+              (dom/div #js {:className (str "graph"
+                                            (when (= graph-state :fullscreen)
+                                              " fullscreen"))
+                            :onClick #(handle-fullscreen-graph owner graph-state)}
+                (render-graph graph-state (find-terms app) app)
+                (dom/button #js {:className "showHide"
+                                 :onClick
+                                 #(handle-hide-show-graph owner graph-state)}
+                            (case graph-state
+                              (:show :fullscreen) "v"
+                              :hide "^"))))))))
 
 (om/root
   app-view
