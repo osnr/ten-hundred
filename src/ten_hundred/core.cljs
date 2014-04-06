@@ -6,7 +6,8 @@
             [clojure.string :as string]
             [cljs-uuid-utils :as uuid]
             [ten-hundred.dict :as dict]
-            [ten-hundred.graph :as graph]))
+            [ten-hundred.graph :as graph]
+            [ten-hundred.docs :as docs]))
 
 (enable-console-print!)
 
@@ -102,30 +103,28 @@
    :meaning ""
    :focus (chan)})
 
-;; (def app-state
-;;   (atom [[(empty-definition)]]))
-
-(def app-state
-  (atom [[(assoc (empty-definition)
-            :term "score"
-            :meaning "five times four")
-          (assoc (empty-definition)
-            :term "continent"
-            :meaning "big piece of land")
-          (assoc (empty-definition)
-            :term "nation"
-            :meaning "a people")
-          (assoc (empty-definition)
-            :term "conceived"
-            :meaning "made up")
-          (assoc (empty-definition)
-            :term "proposition"
-            :meaning "an idea that could be right or wrong")]
-         [(assoc (empty-definition)
-            :term "Gettysburg"
-            :meaning (str "Four score and seven years ago our fathers brought forth "
-                          "on this continent, a new nation, conceived in Liberty, "
-                          "and dedicated to the proposition that all men are created equal."))]]))
+(defn make-example-state []
+  {:id (uuid/uuid-string (uuid/make-random-uuid))
+   :levels [[(assoc (empty-definition)
+               :term "score"
+               :meaning "five times four")
+             (assoc (empty-definition)
+               :term "continent"
+               :meaning "big piece of land")
+             (assoc (empty-definition)
+               :term "nation"
+               :meaning "a people")
+             (assoc (empty-definition)
+               :term "conceived"
+               :meaning "made up")
+             (assoc (empty-definition)
+               :term "proposition"
+               :meaning "an idea that could be right or wrong")]
+            [(assoc (empty-definition)
+               :term "Gettysburg"
+               :meaning (str "Four score and seven years ago our fathers brought forth "
+                             "on this continent, a new nation, conceived in Liberty, "
+                             "and dedicated to the proposition that all men are created equal."))]]})
 
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
@@ -203,12 +202,13 @@
      levels)))
 
 (defn add-level [app]
-  (om/transact! app #(conj % [(empty-definition)])))
+  (om/transact! app :levels #(conj % [(empty-definition)])))
 
 (defn build-level [app delete-level level]
   (om/build level-view level
             {:init-state {:delete-level delete-level}
-             :state {:terms (find-terms (take-while #(not= % level) app))}}))
+             :state {:terms (find-terms (take-while #(not= % level)
+                                                    (:levels app)))}}))
 
 (defn handle-fullscreen-graph [owner graph-state]
   (om/set-state! owner :graph-state
@@ -230,21 +230,21 @@
     om/IInitState
     (init-state [_]
       {:graph-state :show
+       :show-about false
        :delete-level (chan)})
     om/IWillMount
     (will-mount [_]
       (let [delete-level (om/get-state owner :delete-level)]
         (go (loop []
           (let [level (<! delete-level)]
-            (om/transact! app
+            (om/transact! app :levels
               (fn [levels] (vec (remove #(= level %) levels))))
             (recur))))))
     om/IRenderState
     (render-state [this {:keys [graph-state
                                 delete-level]}]
-      (.log js/console (js/JSON.stringify (clj->js app)))
       (apply dom/div #js {:className "app"}
-        (conj (mapv #(build-level app delete-level %) app)
+        (conj (mapv #(build-level app delete-level %) (:levels app))
               (dom/button #js {:className "addLevel"
                                :onClick #(add-level app)}
                           "+level")
@@ -252,15 +252,43 @@
                                             (when (= graph-state :fullscreen)
                                               " fullscreen"))
                             :onClick #(handle-fullscreen-graph owner graph-state)}
-                (render-graph graph-state (find-terms app) app)
-                (dom/button #js {:className "showHide"
-                                 :onClick
-                                 #(handle-hide-show-graph owner graph-state)}
-                            (case graph-state
-                              (:show :fullscreen) "v"
-                              :hide "^"))))))))
+                (render-graph graph-state (find-terms
+                                           (:levels app))
+                              (:levels app))
+                (dom/div #js {:className "controls"}
+                         (dom/button #js {:onClick (fn [] 
+                                                     (docs/save! @app)
+                                                     false)}
+                                     "save")
+                         (dom/button #js {:onClick (fn []
+                                                     (js/window.open "https://github.com/osnr/ten-hundred")
+                                                     false)}
+                                     "about")
+                         (dom/button #js {:className "showHide"
+                                          :onClick
+                                          #(handle-hide-show-graph owner graph-state)}
+                                     (case graph-state
+                                       (:show :fullscreen) "v"
+                                       :hide "^")))))))))
 
-(om/root
-  app-view
-  app-state
-  {:target (. js/document (getElementById "container"))})
+(defn init-root [app-state]
+  (js/window.history.replaceState "" ""
+                                  (str "/ten-hundred/#/" (:id app-state)))
+  (js/console.log (pr-str app-state))
+  (om/root app-view
+           (atom app-state)
+           {:target (. js/document (getElementById "container"))}))
+
+(defn init []
+  (let [id (second (string/split (.-URL js/document) #"#/"))]
+    (if (empty? id)
+      (init-root (make-example-state))
+      (docs/load id
+                 (fn [loaded-state]
+                   (js/console.log (pr-str loaded-state))
+                   (init-root loaded-state))
+                 (fn []
+                   (init-root (assoc (make-example-state)
+                                :id id)))))))
+
+(init)
