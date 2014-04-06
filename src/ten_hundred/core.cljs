@@ -41,7 +41,6 @@
                      (graph/calc-points layout e))}))
 
 (defn render-graph [graph-state terms levels]
-  (println graph-state)
   (when (not= graph-state :hide)
     (let [g (->> levels
                  (graph/adjacency-list terms)
@@ -59,6 +58,12 @@
                       :viewBox (str "0 0 "
                                     width " "
                                     height)})
+        (js/React.DOM.defs ; <defs> not supported in Om
+         #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
+              "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
+                            refx=\"5\" refy=\"2\" orient=\"auto\">
+              <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
+              </marker>"}})
         (apply dom/g #js {:className "nodes"}
           (map #(render-node g % (.node layout %))
                (.nodes layout)))
@@ -118,7 +123,9 @@
             :meaning "an idea that could be right or wrong")]
          [(assoc (empty-definition)
             :term "Gettysburg"
-            :meaning "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.")]]))
+            :meaning (str "Four score and seven years ago our fathers brought forth "
+                          "on this continent, a new nation, conceived in Liberty, "
+                          "and dedicated to the proposition that all men are created equal."))]]))
 
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
@@ -233,7 +240,9 @@
               (fn [levels] (vec (remove #(= level %) levels))))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [delete-level graph-state]}]
+    (render-state [this {:keys [graph-state
+                                delete-level]}]
+      (.log js/console (js/JSON.stringify (clj->js app)))
       (apply dom/div #js {:className "app"}
         (conj (mapv #(build-level app delete-level %) app)
               (dom/button #js {:className "addLevel"
