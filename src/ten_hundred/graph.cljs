@@ -97,18 +97,54 @@
           (conj points
                 (intersect-rect target p1)))))
 
+(defn- control-points [[x0 y0] [x1 y1] [x2 y2] t]
+  (let [d01 (js/Math.sqrt (+ (js/Math.pow (- x1 x0) 2)
+                             (js/Math.pow (- y1 y0) 2)))
+        d12 (js/Math.sqrt (+ (js/Math.pow (- x2 x1) 2)
+                             (js/Math.pow (- y2 y1) 2)))
+
+        fa (/ (* t d01)
+              (+ d01 d12))
+        fb (- t fa)
+
+        p1x (+ x1 (* fa (- x0 x2)))
+        p1y (+ y1 (* fa (- y0 y2)))
+
+        p2x (- x1 (* fb (- x0 x2)))
+        p2y (- y1 (* fb (- y0 y2)))]
+    [[p1x p1y]
+     [p2x p2y]]))
+
+(defn js-point->vec [p]
+  [(.-x p)
+   (.-y p)])
+
 (defn points->svg-path [points]
-  (let [start (first points)
-        control (second points)
-        end (last points)]
-    (->> points
-         (rest)
-         (butlast)
-         (rest)
-         (mapv (fn [p] (str "T " (.-x p) " " (.-y p))))
-         (cons (str "Q " (.-x control) " " (.-y control)
-                    " " (.-x end) " " (.-y end)))
-         (cons (str "M " (.-x start) " " (.-y start)))
-         (string/join " "))))
+  (let [points (map js-point->vec points)
+        [fx fy] (first points)
+        [sx sy] (second points)
+        [lx ly] (last points)
+        [slx sly] (last (butlast points))
 
+        cubic-points
+        (->> points
+             (partition 3 2)
+             (mapv (fn [[p0 p1 p2]]
+                     (let [[cp0 cp1]
+                           (control-points p0 p1 p2 0.5)]
+                       [cp0 cp1 p2]))))
 
+        [cpsx cpsy] (first (first cubic-points))
+        [cplx cply] (second (last cubic-points))]
+    (str "M " fx " " fy " "
+         "Q " cpsx " " cpsy
+         " " sx " " sy
+         (string/join
+          " "
+          (mapv (fn [[[cp0x cp0y] [cp1x cp1y] [px py]]]
+                  (str "C " cp0x " " cp0y
+                       " " cp1x " " cp1y
+                       " " px " " py))
+                (butlast cubic-points)))
+         "Q " cplx " " cply " "
+         " " lx " " ly)))
