@@ -11,6 +11,7 @@
 
 (enable-console-print!)
 
+; graph view
 (defn handle-node-click [focus]
   (put! focus :focus)
   false)
@@ -126,6 +127,36 @@
                              "on this continent, a new nation, conceived in Liberty, "
                              "and dedicated to the proposition that all men are created equal."))]]})
 
+; definition expansion view
+; 0 -> no expansion
+; 1 -> 1 level deep
+; etc
+(defn expand [terms degree meaning]
+  (.log js/console (pr-str terms))
+  (str meaning " expanded"))
+
+(defn handle-degree-change [e owner]
+  (js/console.log (.. e -target -value))
+  (om/set-state! owner :degree (.. e -target -value)))
+
+(defn definition-expansion-view [definition owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:degree 0})
+    om/IRenderState
+    (render-state [this {:keys [degree close terms]}]
+      (dom/div #js {:className "expansion"}
+        (dom/input #js {:type "range"
+                        :min 0
+                        :max 5
+                        :value degree
+                        :onChange #(handle-degree-change % owner)})
+        (dom/div #js {:className "expanded-meaning"}
+                 (expand terms degree (:meaning definition)))
+        (dom/button #js {:onClick close})))))
+
+; definition view
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
 
@@ -134,6 +165,9 @@
 
 (defn definition-view [definition owner]
   (reify
+    om/IInitState
+    (init-state [_]
+      {:show-expansion false})
     om/IWillMount
     (will-mount [_]
       (let [focus (:focus definition)]
@@ -145,9 +179,11 @@
                                    (.focus)))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [terms delete-definition]}]
+    (render-state [this {:keys [show-expansion terms delete-definition]}]
       (dom/div #js {:className "definition"
-                    :ref (:term definition)}
+                    :draggable true}
+        (dom/button #js {:className "expand"
+                         :onClick #(om/set-state! owner :show-expansion true)})
         (dom/input #js {:type "text" :placeholder "Term"
                         :className "term"
                         :value (:term definition)
@@ -161,8 +197,13 @@
                              :onChange #(handle-meaning-change % definition)})
           (apply dom/pre #js {:className "bg"}
             (colorize terms
-                      (:meaning definition))))))))
+                      (:meaning definition))))
+        (when show-expansion
+          (om/build definition-expansion-view definition
+                    {:init-state {:close #(om/set-state! owner :show-expansion false)}
+                     :state {:terms terms}}))))))
 
+; level view
 (defn add-definition [level]
   (om/transact! level #(conj % (empty-definition))))
 
@@ -190,6 +231,7 @@
         (dom/button #js {:className "deleteLevel"
                          :onClick #(put! delete-level @level)} "x")))))
 
+; whole-app view and graph pane
 (defn find-terms [levels]
   (apply concat
     (map-indexed
@@ -273,7 +315,7 @@
 
 (defn init-root [app-state]
   (js/window.history.replaceState "" ""
-                                  (str "/ten-hundred/#/" (:id app-state)))
+                                  (str "#/" (:id app-state)))
   (js/console.log (pr-str app-state))
   (om/root app-view
            (atom app-state)

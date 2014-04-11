@@ -27,7 +27,7 @@ body {
 }
 
 .term {
-    width: 375px;
+    width: 355px;
 }
 .delete {
     width: 20px;
@@ -68,6 +68,20 @@ body {
 }
 .meaning > .edit {
 
+}
+
+.expansion {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background-color: rgba(128,128,128,0.9);
+    z-index: 99;
+}
+.expanded-meaning {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
 }
 
 .defined {
