@@ -1,12 +1,12 @@
 (ns ten-hundred.graph
   (:require [clojure.string :as string]))
 
-(defn deps [terms level meaning]
+(defn deps [terms level-idx meaning]
   (->> meaning
        (re-seq #"[^\w']+|[\w']+")
        (map (fn [token]
               (let [lc-token (string/lower-case token)]
-                (first (filter #(and (< (:level %) level)
+                (first (filter #(and (< (:level-idx %) level-idx)
                                      (= (:term %) lc-token))
                                terms)))))
        (distinct)
@@ -23,7 +23,7 @@
 
              :deps (deps terms idx meaning)
              :focus focus
-             :level idx})
+             :level-idx idx})
           level))
    levels)))
 

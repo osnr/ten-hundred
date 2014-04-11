@@ -79,24 +79,24 @@
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
 
-(defn colorize-token [terms token]
-  (let [lc-token (string/lower-case token)]
-    (cond (re-matches #"[^\w']+" token) token
-
-          (and terms (find-term terms lc-token))
+(defn colorize-word [terms word]
+  (let [lc-word (string/lower-case word)]
+    (cond (and terms (find-term terms lc-word))
           (dom/span #js {:className "defined"
                          :onClick #(handle-term-click
-                                    (find-term terms lc-token))}
-                    token)
+                                    (find-term terms lc-word))}
+                    word)
 
-          (dict/words lc-token) token
+          (dict/words lc-word) word
 
-          :else (dom/span #js {:className "uncommon"} token))))
+          :else (dom/span #js {:className "uncommon"} word))))
 
-(defn colorize [terms text]
+(defn word-map [f text]
   (->> text
        (re-seq #"[^\w']+|[\w']+")
-       (map #(colorize-token terms %))))
+       (map #(if (re-matches #"[^\w']+" %)
+               %
+               (f %)))))
 
 (defn empty-definition []
   {:uuid (uuid/uuid-string (uuid/make-random-uuid))
@@ -131,9 +131,14 @@
 ; 0 -> no expansion
 ; 1 -> 1 level deep
 ; etc
+(defn expand-word [expand-terms word]
+  (if-let [term-meaning (:meaning (find-term expand-terms word))]
+    (dom/span #js {:className "expanded-word"} "[" term-meaning "]")
+    word))
+
 (defn expand [terms degree meaning]
-  (.log js/console (pr-str terms))
-  (str meaning " expanded"))
+  (let [expand-terms (filter #(<= degree (:level-idx %)) terms)]
+    (word-map #(expand-word expand-terms %) meaning)))
 
 (defn handle-degree-change [e owner]
   (js/console.log (.. e -target -value))
@@ -141,20 +146,18 @@
 
 (defn definition-expansion-view [definition owner]
   (reify
-    om/IInitState
-    (init-state [_]
-      {:degree 0})
     om/IRenderState
-    (render-state [this {:keys [degree close terms]}]
-      (dom/div #js {:className "expansion"}
-        (dom/input #js {:type "range"
-                        :min 0
-                        :max 5
-                        :value degree
-                        :onChange #(handle-degree-change % owner)})
-        (dom/div #js {:className "expanded-meaning"}
-                 (expand terms degree (:meaning definition)))
-        (dom/button #js {:onClick close})))))
+    (render-state [this {:keys [level-idx degree close terms]}]
+      (dom/div #js {:className "expansion-container"}
+        (dom/div #js {:className "expansion"}
+          (dom/input #js {:type "range"
+                          :min 0
+                          :max level-idx
+                          :value degree
+                          :onChange #(handle-degree-change % owner)})
+          (apply dom/div #js {:className "expanded-meaning"}
+            (expand terms degree (:meaning definition)))
+          (dom/button #js {:onClick close}))))))
 
 ; definition view
 (defn handle-term-change [e definition]
@@ -179,7 +182,7 @@
                                    (.focus)))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [show-expansion terms delete-definition]}]
+    (render-state [this {:keys [level-idx show-expansion terms delete-definition]}]
       (dom/div #js {:className "definition"
                     :draggable true}
         (dom/button #js {:className "expand"
@@ -196,12 +199,14 @@
                              :value (:meaning definition)
                              :onChange #(handle-meaning-change % definition)})
           (apply dom/pre #js {:className "bg"}
-            (colorize terms
+            (word-map #(colorize-word terms %)
                       (:meaning definition))))
         (when show-expansion
           (om/build definition-expansion-view definition
-                    {:init-state {:close #(om/set-state! owner :show-expansion false)}
-                     :state {:terms terms}}))))))
+                    {:init-state {:degree level-idx
+                                  :close #(om/set-state! owner :show-expansion false)}
+                     :state {:level-idx level-idx
+                             :terms terms}}))))))
 
 ; level view
 (defn add-definition [level]
@@ -221,12 +226,13 @@
               (fn [level] (vec (remove #(= definition %) level))))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [delete-level terms delete-definition]}]
+    (render-state [this {:keys [delete-level idx terms delete-definition]}]
       (dom/div #js {:className "level"}
         (apply dom/div nil
           (om/build-all definition-view level
                         {:init-state {:delete-definition delete-definition}
-                         :state {:terms terms}}))
+                         :state {:level-idx idx
+                                 :terms terms}}))
         (dom/button #js {:onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"
                          :onClick #(put! delete-level @level)} "x")))))
@@ -238,7 +244,8 @@
      (fn [idx level]
        (map #(hash-map :uuid (:uuid %)
                        :term (string/lower-case (:term %))
-                       :level idx
+                       :meaning (:meaning %)
+                       :level-idx idx
                        :focus (:focus %))
             (remove #(empty? (:term %)) level)))
      levels)))
@@ -246,11 +253,13 @@
 (defn add-level [app]
   (om/transact! app :levels #(conj % [(empty-definition)])))
 
-(defn build-level [app delete-level level]
+(defn build-level [app delete-level idx level]
   (om/build level-view level
             {:init-state {:delete-level delete-level}
-             :state {:terms (find-terms (take-while #(not= % level)
-                                                    (:levels app)))}}))
+             :state {:idx idx
+                     :terms (find-terms
+                             (take-while #(not= % level)
+                                         (:levels app)))}}))
 
 (defn handle-fullscreen-graph [owner graph-state]
   (om/set-state! owner :graph-state
@@ -286,7 +295,8 @@
     (render-state [this {:keys [graph-state
                                 delete-level]}]
       (apply dom/div #js {:className "app"}
-        (conj (mapv #(build-level app delete-level %) (:levels app))
+        (conj (vec (map-indexed #(build-level app delete-level %1 %2)
+                                (:levels app)))
               (dom/button #js {:className "addLevel"
                                :onClick #(add-level app)}
                           "+level")

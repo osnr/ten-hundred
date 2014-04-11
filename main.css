@@ -70,18 +70,34 @@ body {
 
 }
 
-.expansion {
+.expansion-container {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
     right: 0;
-    background-color: rgba(128,128,128,0.9);
     z-index: 99;
+}
+.expansion {
+    position: absolute;
+
+    background-color: rgba(128,128,128,0.9);
+
+    width: 500px;
+    left: 50%;
+    margin-left: -250px;
+    height: 100%;
+
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 10px;
 }
 .expanded-meaning {
     white-space: pre-wrap;
     overflow-wrap: break-word;
+}
+.expanded-word {
+    background-color: rgba(0,0,255,0.25);
 }
 
 .defined {
