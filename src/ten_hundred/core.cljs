@@ -94,9 +94,9 @@
 (defn word-map [f text]
   (->> text
        (re-seq #"[^\w']+|[\w']+")
-       (map #(if (re-matches #"[^\w']+" %)
-               %
-               (f %)))))
+       (mapv #(if (re-matches #"[^\w']+" %)
+                %
+                (f %)))))
 
 (defn empty-definition []
   {:uuid (uuid/uuid-string (uuid/make-random-uuid))
@@ -125,20 +125,29 @@
                :term "Gettysburg"
                :meaning (str "Four score and seven years ago our fathers brought forth "
                              "on this continent, a new nation, conceived in Liberty, "
-                             "and dedicated to the proposition that all men are created equal."))]]})
+                             "and dedicated to the proposition that all men are created equal."))]
+            [(assoc (empty-definition)
+               :term "cool"
+               :meaning "GettysBurg")]]})
 
 ; definition expansion view
 ; 0 -> no expansion
 ; 1 -> 1 level deep
 ; etc
-(defn expand-word [expand-terms word]
-  (if-let [term-meaning (:meaning (find-term expand-terms word))]
-    (dom/span #js {:className "expanded-word"} "[" term-meaning "]")
+(defn expand-word [terms degree word]
+  (if-let [{term-level-idx :level-idx
+            term-meaning :meaning}
+           (find-term terms (string/lower-case word))]
+    (if (>= term-level-idx degree)
+      (apply dom/span #js {:className "expanded-word"}
+        "["
+        (conj (expand terms degree term-meaning)
+              "]"))
+      (dom/span #js {:className "expandable-word"} word))
     word))
 
 (defn expand [terms degree meaning]
-  (let [expand-terms (filter #(<= degree (:level-idx %)) terms)]
-    (word-map #(expand-word expand-terms %) meaning)))
+  (word-map #(expand-word terms degree %) meaning))
 
 (defn handle-degree-change [e owner]
   (js/console.log (.. e -target -value))

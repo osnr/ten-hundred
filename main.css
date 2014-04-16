@@ -27,6 +27,9 @@ body {
 }
 
 .term {
+    font-family: Georgia, serif;
+    font-size: 13px;
+
     width: 355px;
 }
 .delete {
@@ -45,8 +48,9 @@ body {
     width: 100%;
     height: 100%;
 
-    font-family: sans-serif;
+    font-family: Georgia, serif;
     font-size: 13px;
+    line-height: 1.3em;
 
     padding: 2px;
     margin: 0;
@@ -76,12 +80,17 @@ body {
     left: 0;
     bottom: 0;
     right: 0;
+    background-color: rgba(0, 0, 0, 0.25);
     z-index: 99;
 }
 .expansion {
     position: absolute;
 
-    background-color: rgba(128,128,128,0.9);
+    background-color: whitesmoke;
+
+    font-family: Georgia, serif;
+    font-size: 15px;
+    line-height: 1.4em;
 
     width: 500px;
     left: 50%;
@@ -91,10 +100,17 @@ body {
     padding-left: 10px;
     padding-right: 10px;
     padding-top: 10px;
+
+    -webkit-box-shadow: 0px 0px 100px 0px rgba(0, 0, 0, 0.75);
+    -moz-box-shadow:    0px 0px 100px 0px rgba(0, 0, 0, 0.75);
+    box-shadow:         0px 0px 100px 0px rgba(0, 0, 0, 0.75);
 }
 .expanded-meaning {
     white-space: pre-wrap;
     overflow-wrap: break-word;
+}
+.expandable-word {
+    background-color: rgba(0,0,255,0.05);
 }
 .expanded-word {
     background-color: rgba(0,0,255,0.25);
