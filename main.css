@@ -1,9 +1,32 @@
 body {
+    margin: 0;
+    padding: 0;
     white-space: nowrap;
 }
 
+.levelsWrapper {
+    float: left;
+    width: 100%;
+}
+.levels {
+    box-sizing: border-box;
+
+    padding-top: 20px;
+    padding-left: 20px;
+
+    margin-right: 400px;
+    height: 100%;
+    overflow: scroll;
+}
 .addLevel {
 
+}
+
+.sidebar {
+    float: left;
+    width: 400px;
+    margin-left: -400px;
+    height: 100%;
 }
 
 /* level */
@@ -11,7 +34,7 @@ body {
     background-color: rgba(128, 128, 128, 0.1);
     vertical-align: top;
     display: inline-block;
-    margin-right: 2em;
+    margin-right: 20px;
 }
 .deleteLevel {
     width: 25px;
@@ -42,7 +65,7 @@ body {
 }
 
 .defTrans-leave {
-    animation: slideout 0.8s;
+    animation: slideout 0.2s;
     animation-timing-function: cubic-bezier;
     overflow: hidden;
 }
@@ -89,21 +112,14 @@ body {
     pointer-events: none;
 
     user-select: none;
+
+    overflow: hidden;
 }
 .meaning > .edit {
 
 }
 
 /* expansion */
-.expansion-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    background-color: rgba(0, 0, 0, 0.25);
-    z-index: 99;
-}
 .expansion {
     position: absolute;
 
@@ -113,16 +129,11 @@ body {
     font-size: 15px;
     line-height: 1.4em;
 
-    width: 500px;
-    left: 50%;
-    margin-left: -250px;
-    height: 100%;
+    width: 360px;
+    top: 0;
+    right: 0;
 
-    padding-left: 2em;
-    padding-right: 2em;
-    padding-top: 2em;
-
-    box-shadow:         0px 0px 100px 0px rgba(0, 0, 0, 0.75);
+    padding: 20px;
 }
 .expanded-meaning {
     white-space: pre-wrap;
@@ -133,7 +144,7 @@ body {
     transition: all .25s;
 }
 .expanded-word {
-    background-color: rgba(0,0,255,0.25);
+    background-color: rgba(0,0,255,0.15);
     transition: all .25s;
 }
 .expansion .close {

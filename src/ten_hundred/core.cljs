@@ -42,36 +42,35 @@
                  :d (graph/points->svg-path
                      (graph/calc-points layout e))}))
 
-(defn render-graph [graph-state terms levels]
-  (when (not= graph-state :hide)
-    (let [g (->> levels
-                 (graph/adjacency-list terms)
-                 (graph/graph))
-          layout (graph/layout g)
-          value (.-_value layout)
+(defn render-graph [fullscreen-graph terms levels]
+  (let [g (->> levels
+               (graph/adjacency-list terms)
+               (graph/graph))
+        layout (graph/layout g)
+        value (.-_value layout)
 
-          width (.-width value)
-          height (.-height value)]
-      (dom/svg (if (= graph-state :fullscreen)
-                 #js {:width width
-                      :height height}
-                 #js {:width width
-                      :height 250
-                      :viewBox (str "0 0 "
-                                    width " "
-                                    height)})
-        (js/React.DOM.defs ; <defs> not supported in Om
-         #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
-              "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
-                            refx=\"5\" refy=\"2\" orient=\"auto\">
-              <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
-              </marker>"}})
-        (apply dom/g #js {:className "nodes"}
-          (map #(render-node g % (.node layout %))
-               (.nodes layout)))
-        (apply dom/g #js {:className "edges"}
-          (map #(render-edge layout %)
-               (.edges layout)))))))
+        width (.-width value)
+        height (.-height value)]
+    (dom/svg (if fullscreen-graph
+               #js {:width width
+                    :height height}
+               #js {:width 380
+                    :height 320
+                    :viewBox (str "0 0 "
+                                  width " "
+                                  height)})
+      (js/React.DOM.defs ; <defs> not supported in Om
+       #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
+            "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
+                          refx=\"5\" refy=\"2\" orient=\"auto\">
+            <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
+            </marker>"}})
+      (apply dom/g #js {:className "nodes"}
+        (map #(render-node g % (.node layout %))
+             (.nodes layout)))
+      (apply dom/g #js {:className "edges"}
+        (map #(render-edge layout %)
+             (.edges layout))))))
 
 (defn handle-term-click [term-state]
   (put! (:focus term-state) :focus))
@@ -157,22 +156,37 @@
   (reify
     om/IRenderState
     (render-state [this {:keys [level-idx degree close terms]}]
-      (dom/div #js {:className "expansion-container"
-                    :onClick close}
-        (dom/div #js {:className "expansion"
-                      :onClick (constantly false)}
-          (dom/input #js {:type "range"
-                          :min 0
-                          :max level-idx
-                          :value degree
-                          :onChange #(handle-degree-change % owner)})
-          (apply dom/div #js {:className "expanded-meaning"}
-            (expand terms degree (:meaning definition)))
-          (dom/button #js {:className "close"
-                           :onClick close}
-                      "x"))))))
+      (dom/div #js {:className "expansion"
+                    :onClick (constantly false)}
+        (dom/input #js {:type "range"
+                        :min 0
+                        :max level-idx
+                        :value degree
+                        :onChange #(handle-degree-change % owner)})
+        (apply dom/div #js {:className "expanded-meaning"}
+          (expand terms degree (:meaning definition)))
+        (dom/button #js {:className "close"
+                         :onClick close}
+                    "x")))))
 
 ; definition view
+(def drag-state (atom {:dragged nil
+                       :placeholder nil}))
+(defn drag-start [e]
+  (swap! drag-state (assoc :dragged (.-currentTarget e)))
+  (let [data-transfer (.-dataTransfer e)]
+    (set! (.-effectAllowed data-transfer) "move")
+    (.setData data-transfer "text/html" (.-currentTarget e))))
+
+(defn drag-end [e]
+  (let [dragged (:dragged @drag-state)]
+    (set! (.-display (.-style dragged)) "block")
+    (.removeChild (.-parentNode dragged) placeholder)
+
+    ))
+
+(defn drag-over [e])
+
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
 
@@ -195,15 +209,14 @@
                                    (.focus)))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [level-idx show-expansion terms delete-definition]}]
+    (render-state [this {:keys [level-idx show-expansion terms inspect delete-definition]}]
       (dom/div #js {:className "definition"
                     :draggable true
-                    :onDragStart (fn [e]
-                                   (js/console.log e)
-                                   ;; (.setDragImage (.-dataTransfer e) (.-target e) 0 0)
-                                   )}
+                    :onDragStart drag-start
+                    :onDragEnd drag-end
+                    :onDragOver drag-over}
         (dom/button #js {:className "expand"
-                         :onClick #(om/set-state! owner :show-expansion true)}
+                         :onClick #(put! inspect (:uuid @definition))}
                     "i")
         (dom/input #js {:type "text" :placeholder "Term"
                         :className "term"
@@ -218,13 +231,7 @@
                              :onChange #(handle-meaning-change % definition)})
           (apply dom/pre #js {:className "bg"}
             (word-map #(colorize-word terms %)
-                      (:meaning definition))))
-        (when show-expansion
-          (om/build definition-expansion-view definition
-                    {:init-state {:degree level-idx
-                                  :close #(om/set-state! owner :show-expansion false)}
-                     :state {:level-idx level-idx
-                             :terms terms}}))))))
+                      (:meaning definition))))))))
 
 ; level view
 (defn add-definition [level]
@@ -245,13 +252,14 @@
               (fn [level] (vec (remove #(= definition %) level))))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [delete-level idx terms delete-definition]}]
+    (render-state [this {:keys [inspect delete-level level-idx terms delete-definition]}]
       (dom/div #js {:className "level"}
         (apply css-trans-group #js {:transitionName "defTrans"}
           (om/build-all definition-view level
                         {:key :uuid
-                         :init-state {:delete-definition delete-definition}
-                         :state {:level-idx idx
+                         :init-state {:inspect inspect
+                                      :delete-definition delete-definition}
+                         :state {:level-idx level-idx
                                  :terms terms}}))
         (dom/button #js {:className "addDefinition"
                          :onClick #(add-definition level)} "+def")
@@ -274,75 +282,93 @@
 (defn add-level [app]
   (om/transact! app :levels #(conj % [(empty-definition)])))
 
-(defn build-level [app delete-level idx level]
+(defn build-level [app delete-level inspect level-idx level]
   (om/build level-view level
-            {:init-state {:delete-level delete-level}
-             :state {:idx idx
+            {:init-state {:inspect inspect
+                          :delete-level delete-level}
+             :state {:level-idx level-idx
                      :terms (find-terms
-                             (take-while #(not= % level)
-                                         (:levels app)))}}))
+                             (take level-idx (:levels app)))}}))
 
-(defn handle-fullscreen-graph [owner graph-state]
-  (om/set-state! owner :graph-state
-    (case graph-state
-      :show :fullscreen
-      :hide :show
-      :fullscreen :show)))
+(defn handle-fullscreen-graph [owner fullscreen-graph]
+  (om/update-state! owner :fullscreen-graph not))
 
-(defn handle-hide-show-graph [owner graph-state]
-  (om/set-state! owner :graph-state
-    (case graph-state
-      :show :hide
-      :fullscreen :hide
-      :hide :show))
-  false)
+(defn log-id [x] (js/console.log (pr-str x)) x)
+(defn find-definition [levels uuid]
+  (->> levels
+       (map-indexed
+        (fn [level-idx level]
+          (if-let [definition (first (filter #(= (:uuid %) uuid) level))]
+            [level-idx definition]
+            nil)))
+       (filter identity)
+       (first)))
 
 (defn app-view [app owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:graph-state :show
-       :show-about false
+      {:inspect-id nil
+       :fullscreen-graph false
+       :inspect (chan)
        :delete-level (chan)})
     om/IWillMount
     (will-mount [_]
-      (let [delete-level (om/get-state owner :delete-level)]
+      (let [inspect (om/get-state owner :inspect)
+            delete-level (om/get-state owner :delete-level)]
+        (go (loop []
+          (let [id (<! inspect)]
+            (om/set-state! owner :inspect-id id)
+            (recur))))
+
         (go (loop []
           (let [level (<! delete-level)]
             (om/transact! app :levels
               (fn [levels] (vec (remove #(= level %) levels))))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [graph-state
+    (render-state [this {:keys [inspect-id
+                                inspect
+                                fullscreen-graph
                                 delete-level]}]
-      (apply dom/div #js {:className "app"}
-        (conj (vec (map-indexed #(build-level app delete-level %1 %2)
-                                (:levels app)))
-              (dom/button #js {:className "addLevel"
-                               :onClick #(add-level app)}
-                          "+level")
-              (dom/div #js {:className (str "graph"
-                                            (when (= graph-state :fullscreen)
-                                              " fullscreen"))
-                            :onClick #(handle-fullscreen-graph owner graph-state)}
-                (render-graph graph-state (find-terms
-                                           (:levels app))
-                              (:levels app))
-                (dom/div #js {:className "controls"}
-                         (dom/button #js {:onClick (fn [] 
-                                                     (docs/save! @app)
-                                                     false)}
-                                     "save")
-                         (dom/button #js {:onClick (fn []
-                                                     (js/window.open "https://github.com/osnr/ten-hundred")
-                                                     false)}
-                                     "about")
-                         (dom/button #js {:className "showHide"
-                                          :onClick
-                                          #(handle-hide-show-graph owner graph-state)}
-                                     (case graph-state
-                                       (:show :fullscreen) "v"
-                                       :hide "^")))))))))
+      (dom/div #js {:className "app"}
+        (dom/div #js {:className "levelsWrapper"}
+          (apply dom/div #js {:className "levels"}
+                 (conj (vec (map-indexed #(build-level app delete-level inspect
+                                                       %1 %2)
+                                         (:levels app)))
+                       (dom/button #js {:className "addLevel"
+                                        :onClick #(add-level app)}
+                                   "+level"))))
+
+        (dom/div #js {:className "sidebar"}
+          (when inspect-id
+            (let [[level-idx definition] (find-definition (:levels app) inspect-id)]
+              (om/build definition-expansion-view
+                        definition
+                        {:react-key (str (:uuid definition) "_expansion")
+                         :init-state {:degree level-idx
+                                      :close #(om/set-state! owner :inspect-id nil)}
+                         :state {:level-idx level-idx
+                                 :terms (find-terms (take level-idx (:levels app)))}})))
+
+          (dom/div #js {:className (str "graph"
+                                        (when fullscreen-graph
+                                          " fullscreen"))
+                        :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
+            (render-graph fullscreen-graph
+                          (find-terms
+                           (:levels app))
+                          (:levels app))
+            (dom/div #js {:className "controls"}
+              (dom/button #js {:onClick (fn [] 
+                                          (docs/save! @app)
+                                          false)}
+                          "save")
+              (dom/button #js {:onClick (fn []
+                                          (js/window.open "https://github.com/osnr/ten-hundred")
+                                          false)}
+                          "about"))))))))
 
 (defn init-root [app-state]
   (js/window.history.replaceState "" ""
