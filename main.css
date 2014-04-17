@@ -6,6 +6,7 @@ body {
 
 }
 
+/* level */
 .level {
     background-color: rgba(128, 128, 128, 0.1);
     vertical-align: top;
@@ -16,7 +17,11 @@ body {
     width: 25px;
     float: right;
 }
+.addDefinition {
+    float: left;
+}
 
+/* definition */
 .definition {
     margin-bottom: 1em;
     padding-top: 0.5em;
@@ -26,11 +31,31 @@ body {
     background-color: rgba(128, 128, 128, 0.2);
 }
 
+.defTrans-enter {
+    animation: slidein 0.8s;
+    animation-timing-function: cubic-bezier;
+    overflow: hidden;
+}
+@keyframes slidein {
+    0% { max-height: 0; }
+    100% { max-height: 1000px; }
+}
+
+.defTrans-leave {
+    animation: slideout 0.8s;
+    animation-timing-function: cubic-bezier;
+    overflow: hidden;
+}
+@keyframes slideout {
+    0% { max-height: 1000px; }
+    100% { max-height: 0; }
+}
+
 .term {
     font-family: Georgia, serif;
     font-size: 13px;
 
-    width: 355px;
+    width: 352px;
 }
 .delete {
     width: 20px;
@@ -63,17 +88,13 @@ body {
 
     pointer-events: none;
 
-    -webkit-user-select: none; /* Chrome/Safari */
-    -moz-user-select: none; /* Firefox */
-    -ms-user-select: none; /* IE10+ */
-
-    -o-user-select: none;
     user-select: none;
 }
 .meaning > .edit {
 
 }
 
+/* expansion */
 .expansion-container {
     position: fixed;
     top: 0;
@@ -97,12 +118,10 @@ body {
     margin-left: -250px;
     height: 100%;
 
-    padding-left: 10px;
-    padding-right: 10px;
-    padding-top: 10px;
+    padding-left: 2em;
+    padding-right: 2em;
+    padding-top: 2em;
 
-    -webkit-box-shadow: 0px 0px 100px 0px rgba(0, 0, 0, 0.75);
-    -moz-box-shadow:    0px 0px 100px 0px rgba(0, 0, 0, 0.75);
     box-shadow:         0px 0px 100px 0px rgba(0, 0, 0, 0.75);
 }
 .expanded-meaning {
@@ -111,13 +130,21 @@ body {
 }
 .expandable-word {
     background-color: rgba(0,0,255,0.05);
+    transition: all .25s;
 }
 .expanded-word {
     background-color: rgba(0,0,255,0.25);
+    transition: all .25s;
+}
+.expansion .close {
+    position: absolute;
+    top: 2em;
+    right: 2em;
 }
 
+/* definition overlay */
 .defined {
-    background-color: rgba(0,0,255,0.5);
+    background-color: rgba(0,0,255,0.25);
     pointer-events: auto;
     cursor: help;
 }
@@ -125,6 +152,7 @@ body {
     background-color: rgba(255,0,0,0.5);
 }
 
+/* graph */
 .graph {
     position: fixed;
     bottom: 0;
@@ -147,12 +175,15 @@ body {
 .graph svg {
     padding: 10px;
     pointer-events: none;
+
+    transition: all 0.25s;
 }
 .graph.fullscreen svg {
     position: absolute;
     margin: auto;
     top: 0; left: 0; bottom: 0; right: 0;
 }
+
 .nodeRect {
     fill: white;
     stroke: #8888a5;

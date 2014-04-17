@@ -157,8 +157,10 @@
   (reify
     om/IRenderState
     (render-state [this {:keys [level-idx degree close terms]}]
-      (dom/div #js {:className "expansion-container"}
-        (dom/div #js {:className "expansion"}
+      (dom/div #js {:className "expansion-container"
+                    :onClick close}
+        (dom/div #js {:className "expansion"
+                      :onClick (constantly false)}
           (dom/input #js {:type "range"
                           :min 0
                           :max level-idx
@@ -166,7 +168,9 @@
                           :onChange #(handle-degree-change % owner)})
           (apply dom/div #js {:className "expanded-meaning"}
             (expand terms degree (:meaning definition)))
-          (dom/button #js {:onClick close}))))))
+          (dom/button #js {:className "close"
+                           :onClick close}
+                      "x"))))))
 
 ; definition view
 (defn handle-term-change [e definition]
@@ -193,9 +197,14 @@
     om/IRenderState
     (render-state [this {:keys [level-idx show-expansion terms delete-definition]}]
       (dom/div #js {:className "definition"
-                    :draggable true}
+                    :draggable true
+                    :onDragStart (fn [e]
+                                   (js/console.log e)
+                                   ;; (.setDragImage (.-dataTransfer e) (.-target e) 0 0)
+                                   )}
         (dom/button #js {:className "expand"
-                         :onClick #(om/set-state! owner :show-expansion true)})
+                         :onClick #(om/set-state! owner :show-expansion true)}
+                    "i")
         (dom/input #js {:type "text" :placeholder "Term"
                         :className "term"
                         :value (:term definition)
@@ -221,6 +230,7 @@
 (defn add-definition [level]
   (om/transact! level #(conj % (empty-definition))))
 
+(def css-trans-group (-> js/React (aget "addons") (aget "CSSTransitionGroup")))
 (defn level-view [level owner]
   (reify
     om/IInitState
@@ -237,12 +247,14 @@
     om/IRenderState
     (render-state [this {:keys [delete-level idx terms delete-definition]}]
       (dom/div #js {:className "level"}
-        (apply dom/div nil
+        (apply css-trans-group #js {:transitionName "defTrans"}
           (om/build-all definition-view level
-                        {:init-state {:delete-definition delete-definition}
+                        {:key :uuid
+                         :init-state {:delete-definition delete-definition}
                          :state {:level-idx idx
                                  :terms terms}}))
-        (dom/button #js {:onClick #(add-definition level)} "+def")
+        (dom/button #js {:className "addDefinition"
+                         :onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"
                          :onClick #(put! delete-level @level)} "x")))))
 
