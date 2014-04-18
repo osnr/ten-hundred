@@ -7,6 +7,7 @@
             [cljs-uuid-utils :as uuid]
             [ten-hundred.dict :as dict]
             [ten-hundred.graph :as graph]
+            [ten-hundred.drag :as drag]
             [ten-hundred.docs :as docs]))
 
 (enable-console-print!)
@@ -166,61 +167,6 @@
                     "x")))))
 
 ; definition view
-(def drag-state
-  (atom {:dragging nil
-         :dragging-el nil
-         :delete-original! nil
-         :drop! nil
-         :placeholder
-         (let [placeholder (.createElement js/document "div")]
-           (set! (.-className placeholder) "placeholder")
-           placeholder)}))
-
-(defn drag-start [e definition delete-original]
-  (let [current-target (.-currentTarget e)
-        data-transfer (.-dataTransfer e)]
-    (swap! drag-state #(assoc %
-                         :dragging definition
-                         :dragging-el current-target
-                         :delete-original! delete-original))
-    (set! (.-effectAllowed data-transfer) "move")
-    (.setData data-transfer "text/html" current-target)))
-
-(defn drag-end [e]
-  (let [dragging (:dragging @drag-state)
-        dragging-el (:dragging-el @drag-state)
-        delete-original! (:delete-original! @drag-state)
-        drop! (:drop! @drag-state)
-        placeholder (:placeholder @drag-state)]
-    (.removeChild (.-parentNode placeholder) placeholder)
-    (set! (.-display (.-style dragging-el)) "")
-    (drop!)
-    (delete-original!)
-    (swap! drag-state #(dissoc % :dragging :dragging-el :delete-original! :drop!))))
-
-(defn drag-over [e owner drop]
-  (.preventDefault e)
-  (let [target (om/get-node owner)
-        parent (.-parentNode target)
-
-        dragging (:dragging @drag-state)
-        placeholder (:placeholder @drag-state)
-
-        bounding-rect (.getBoundingClientRect target)
-        from-top (js/Math.abs (- (.-top bounding-rect) (.-pageY e)))
-        from-bottom (js/Math.abs (- (.-bottom bounding-rect) (.-pageY e)))
-
-        position (if (< from-top from-bottom)
-                   :above
-                   :below)]
-    (set! (.-display (.-style (:dragging-el @drag-state))) "none")
-
-    (case position
-      :above (.insertBefore parent placeholder target)
-      :below (.insertBefore parent placeholder (.-nextSibling target)))
-    
-    (swap! drag-state #(assoc % :drop! (fn [] (drop dragging position))))))
-
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
 
@@ -245,15 +191,16 @@
                     :id (:uuid definition)
                     :draggable true
                     :onDragStart
-                    (fn [e] (drag-start e @definition
-                                        #(put! delete-definition (:uuid @definition))))
-                    :onDragEnd drag-end
+                    (fn [e]
+                      (drag/drag-start e @definition
+                                       #(put! delete-definition (:uuid @definition))))
+                    :onDragEnd drag/drag-end
                     :onDragOver
-                    #(drag-over % owner
-                                (fn [dragging position]
-                                  (put! drop-on [(:uuid @definition)
-                                                 dragging
-                                                 position])))}
+                    #(drag/drag-over % owner
+                                     (fn [dragging position]
+                                       (put! drop-on [(:uuid @definition)
+                                                      dragging
+                                                      position])))}
         (dom/button #js {:className "expand"
                          :onClick #(put! inspect (:uuid @definition))}
                     "i")
@@ -315,6 +262,7 @@
 
         (go (loop []
           (let [uuid (<! delete-definition)]
+            (js/console.log "delete-definition" uuid)
             (om/transact! level
               (fn [level]
                 (let [[n m] (split-with #(not= (:uuid %) uuid) level)]
@@ -323,9 +271,11 @@
     om/IRenderState
     (render-state [this {:keys [focus inspect delete-level level-idx terms
                                 drop-on delete-definition]}]
+      (js/console.log "rerender")
       (dom/div #js {:className "level"}
         (when (seq level)
-          (apply css-trans-group #js {:transitionName "defTrans"}
+          (apply dom/div nil ;; #js {:component js/React.DOM.div
+                                 ;;      :transitionName "defTrans"}
             (om/build-all definition-view level
                           {:key :uuid
                            :init-state {:focus focus
