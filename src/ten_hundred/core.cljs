@@ -194,7 +194,6 @@
                     (fn [e]
                       (drag/drag-start e @definition
                                        #(put! delete-definition (:uuid @definition))))
-                    :onDragEnd drag/drag-end
                     :onDragOver
                     #(drag/drag-over % owner
                                      (fn [dragging position]
