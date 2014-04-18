@@ -46,12 +46,16 @@ body {
 
 /* definition */
 .definition {
-    margin-bottom: 1em;
     padding-top: 0.5em;
     padding-bottom: 0.5em;
     padding-left: 1em;
     padding-right: 1em;
     background-color: rgba(128, 128, 128, 0.2);
+}
+
+.placeholder {
+    height: 180px;
+    width: 100%;
 }
 
 .defTrans-enter {
@@ -88,6 +92,7 @@ body {
     position: relative;
     width: 400px;
     height: 150px;
+    overflow: auto;
 }
 .meaning > .bg, .meaning > .edit {
     box-sizing: border-box;
@@ -102,7 +107,9 @@ body {
 
     padding: 2px;
     margin: 0;
-    border: 1px solid #aaa;
+    border: 0;
+
+    overflow: hidden;
 }
 .meaning > .bg {
     color: rgba(0,0,0,0);
@@ -114,6 +121,9 @@ body {
     user-select: none;
 
     overflow: hidden;
+}
+.meaning > .bg span {
+    white-space: pre-wrap;
 }
 .meaning > .edit {
 
