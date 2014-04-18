@@ -189,17 +189,11 @@
                                 inspect delete-definition]}]
       (dom/div #js {:className "definition"
                     :id (:uuid definition)
-                    :draggable true
-                    :onDragStart
+                    :onMouseDown
                     (fn [e]
                       (drag/drag-start e @definition
-                                       #(put! delete-definition (:uuid @definition))))
-                    :onDragOver
-                    #(drag/drag-over % owner
-                                     (fn [dragging position]
-                                       (put! drop-on [(:uuid @definition)
-                                                      dragging
-                                                      position])))}
+                                       #(put! delete-definition (:uuid @definition))
+                                       drop-on))}
         (dom/button #js {:className "expand"
                          :onClick #(put! inspect (:uuid @definition))}
                     "i")
