@@ -17,6 +17,8 @@ body {
     margin-right: 400px;
     height: 100%;
     overflow: scroll;
+
+    position: relative;
 }
 .addLevel {
 
@@ -52,8 +54,8 @@ body {
     padding-right: 1em;
     background-color: rgba(128, 128, 128, 0.2);
 }
-.definition.draggingEl {
-    position: fixed;
+.definition.clone {
+    position: absolute;
     pointer-events: none;
 }
 

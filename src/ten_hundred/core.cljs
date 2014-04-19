@@ -189,12 +189,12 @@
     (render-state [this {:keys [level-idx terms
                                 control
                                 delete-definition]}]
-      (js/console.log definition)
       (dom/div #js {:className "definition"
                     :id (:uuid definition)
                     :onMouseDown
                     (fn [e]
                       (drag/drag-start e
+                                       "definition"
                                        @definition
                                        #(put! delete-definition (:uuid @definition))
                                        control))}
