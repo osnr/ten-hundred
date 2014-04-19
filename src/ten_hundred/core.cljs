@@ -1,8 +1,10 @@
 (ns ten-hundred.core
-  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]]
+                   [cljs.core.match.macros :refer [match]])
   (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
             [cljs.core.async :refer [put! chan <!]]
+            [cljs.core.match]
             [clojure.string :as string]
             [cljs-uuid-utils :as uuid]
             [ten-hundred.dict :as dict]
@@ -185,15 +187,16 @@
   (reify
     om/IRenderState
     (render-state [this {:keys [level-idx terms
-                                control drop-on
+                                control
                                 delete-definition]}]
       (dom/div #js {:className "definition"
                     :id (:uuid definition)
                     :onMouseDown
                     (fn [e]
-                      (drag/drag-start e @definition
+                      (drag/drag-start e
+                                       @definition
                                        #(put! delete-definition (:uuid @definition))
-                                       drop-on))}
+                                       control))}
         (dom/button #js {:className "expand"
                          :onClick #(put! control [:inspect (:uuid @definition)])}
                     "i")
@@ -228,41 +231,17 @@
     (will-mount [_]
       (let [delete-definition (om/get-state owner :delete-definition)
             delete-level (om/get-state owner :delete-level)]
-        ;; (go (loop []
-        ;;   (let [[uuid dragging-definition position] (<! drop-on)]
-        ;;     (om/transact! level
-        ;;       (fn [level]
-        ;;         (let [splice-idx
-        ;;               (first (keep-indexed
-        ;;                       (fn [idx definition]
-        ;;                         (if (= (:uuid definition) uuid)
-        ;;                           idx
-        ;;                           nil))
-        ;;                       level))]
-        ;;           (js/console.log splice-idx position)
-        ;;           (case position
-        ;;             :above (apply conj
-        ;;                           (subvec level 0 splice-idx)
-        ;;                           dragging-definition
-        ;;                           (subvec level splice-idx))
-        ;;             :below (apply conj
-        ;;                           (subvec level 0 (inc splice-idx))
-        ;;                           dragging-definition
-        ;;                           (subvec level (inc splice-idx)))))))
-        ;;     (recur))))
-
-        (go (loop []
+        (go-loop []
           (let [uuid (<! delete-definition)]
             (js/console.log "delete-definition" uuid)
             (om/transact! level
-              (fn [level]
-                (let [[n m] (split-with #(not= (:uuid %) uuid) level)]
-                  (vec (concat n (rest m))))))
-            (recur))))))
+                          (fn [level]
+                            (let [[n m] (split-with #(not= (:uuid %) uuid) level)]
+                              (vec (concat n (rest m))))))
+            (recur)))))
     om/IRenderState
     (render-state [this {:keys [control delete-level level-idx terms
-                                drop-on delete-definition]}]
-      (js/console.log "rerender")
+                                delete-definition]}]
       (dom/div #js {:className "level"}
         (when (seq level)
           (apply dom/div nil ;; #js {:component js/React.DOM.div
@@ -314,6 +293,31 @@
        (filter identity)
        (first)))
 
+(defn drop-on [levels definition position uuid]
+  (map (fn [level]
+         (if (seq (filter #(= (:uuid %) uuid) level))
+           (let [splice-idx
+                 (first (keep-indexed
+                         (fn [idx defi]
+                           (if (= (:uuid defi) uuid)
+                             idx
+                             nil))
+                         level))]
+             (case position
+               :above (apply conj
+                             (subvec level 0 splice-idx)
+                             definition
+                             (subvec level splice-idx))
+               :below (apply conj
+                             (subvec level 0 (inc splice-idx))
+                             definition
+                             (subvec level (inc splice-idx)))))
+           level))
+   levels))
+
+(defn drop-on-level [levels definition level-idx]
+  (assoc levels level-idx (conj (levels level-idx) definition)))
+
 (defn app-view [app owner]
   (reify
     om/IInitState
@@ -327,22 +331,25 @@
     (will-mount [_]
       (let [control (om/get-state owner :control)
             delete-level (om/get-state owner :delete-level)]
-        (go (loop []
-          (let [[tag id] (<! control)]
-            (case tag
-              :focus (-> js/document
+        (go-loop []
+          (match (<! control)
+            [:focus id] (-> js/document
                          (.getElementById id)
                          (.getElementsByClassName "edit")
                          (aget 0)
                          (.focus))
-              :inspect (om/set-state! owner :inspect-id id))
-            (recur))))
+            [:inspect id] (om/set-state! owner :inspect-id id)
+            [:drop-on definition position dest-uuid]
+            (om/transact! app :levels #(drop-on % definition position dest-uuid))
+            [:drop-on-level definition level-idx]
+            (om/transact app :levels #(drop-on-level % definition level-idx)))
+          (recur))
 
-        (go (loop []
+        (go-loop []
           (let [level (<! delete-level)]
             (om/transact! app :levels
-              (fn [levels] (vec (remove #(= level %) levels))))
-            (recur))))))
+                          (fn [levels] (vec (remove #(= level %) levels))))
+            (recur)))))
 
     om/IRenderState
     (render-state [this {:keys [inspect-id
@@ -379,13 +386,15 @@
                           (:levels app)
                           control)
             (dom/div #js {:className "controls"}
-              (dom/button #js {:onClick (fn [] 
-                                          (docs/save! @app)
-                                          false)}
+              (dom/button #js {:onClick 
+                               (fn [] 
+                                 (docs/save! @app)
+                                 false)}
                           "save")
-              (dom/button #js {:onClick (fn []
-                                          (js/window.open "https://github.com/osnr/ten-hundred")
-                                          false)}
+              (dom/button #js {:onClick
+                               (fn []
+                                 (js/window.open "https://github.com/osnr/ten-hundred")
+                                 false)}
                           "about"))))))))
 
 (defn init-root [app-state]

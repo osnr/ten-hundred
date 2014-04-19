@@ -1,19 +1,16 @@
 (ns ten-hundred.drag
   (:require [om.core :as om :include-macros true]
+            [cljs.core.async :refer [put!]]
             [goog.dom.classlist :as classlist]))
 
 (def drag-state
-  (atom {:dragging {:clone nil
-                    :definition nil
-                    :offset-x 0
-                    :offset-y 0
-                    :drop-on nil}
+  (atom {:dragging nil
          :placeholder
          (let [placeholder (.createElement js/document "div")]
            (set! (.-className placeholder) "placeholder")
            placeholder)}))
 
-(defn drag-start [e definition delete-original! drop-on]
+(defn drag-start [e definition delete-original! control]
   (when (classlist/contains (.-target e) "definition")
     (let [current-target (.-currentTarget e)
           clone (.cloneNode current-target true)
@@ -26,9 +23,13 @@
                 :dragging
                 {:clone clone
                  :definition definition
+
                  :offset-x (- (.-clientX e) initial-x)
                  :offset-y (- (.-clientY e) initial-y)
-                 :drop-on drop-on}))
+
+                 :drop-data nil
+
+                 :control control}))
       (set! (.-width (.-style clone))
             (str (.-width current-target) "px"))
       (set! (.-height (.-style clone))
@@ -46,27 +47,22 @@
       (delete-original!))))
 
 (defn drag-end [e]
-  (let [dragging (:dragging @drag-state)
-        placeholder (:placeholder @drag-state)
-
-        clone (:clone dragging)
-        drop! (:drop! dragging)]
+  (let [{:keys [clone definition drop-data control]} (:dragging @drag-state)
+        {:keys [position dest-uuid]} drop-data
+        placeholder (:placeholder @drag-state)]
     (.removeEventListener js/document "mousemove" drag-move)
     (.removeEventListener js/document "mouseup" drag-end)
 
     (.removeChild (.-parentNode placeholder) placeholder)
     (.removeChild (.-parentNode clone) clone)
-    (drop!)
+
+    (put! control [:drop-on definition position dest-uuid])
+
     (swap! drag-state #(dissoc % :dragging))))
 
 (defn drag-move [e owner drop]
   (.preventDefault e)
-  (let [dragging (:dragging @drag-state)
-
-        clone (:clone dragging)
-
-        offset-x (:offset-x dragging)
-        offset-y (:offset-y dragging)
+  (let [{:keys [clone offset-x offset-y]} (:dragging @drag-state)
 
         current-x (.-clientX e)
         current-y (.-clientY e)]
@@ -98,6 +94,7 @@
           :above (.insertBefore parent placeholder definition-target)
           :below (.insertBefore parent placeholder (.-nextSibling definition-target)))
 
-        (swap! drag-state #(assoc-in % [:dragging :drop!]
-                                     (fn [] (drop dragging position))))))))
-
+        (swap! drag-state
+               #(assoc-in % [:dragging :drop-data]
+                          {:position position
+                           :dest-uuid (.-id definition-target)}))))))
