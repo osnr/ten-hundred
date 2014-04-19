@@ -13,7 +13,7 @@
 (enable-console-print!)
 
 ; graph view
-(defn render-node [g n value focus]
+(defn render-node [g n value control]
   (let [node (.node g n)
         x (.-x value)
         y (.-y value)
@@ -24,7 +24,7 @@
     (dom/g #js {:transform (str "translate(" (- x (/ width 2))
                                 "," (- y (/ height 2)) ")")}
            (dom/rect #js {:className "nodeRect"
-                          :onClick #(do (put! focus n)
+                          :onClick #(do (put! control [:focus n])
                                         false)
                           :width width
                           :height height})
@@ -39,7 +39,7 @@
                  :d (graph/points->svg-path
                      (graph/calc-points layout e))}))
 
-(defn render-graph [fullscreen-graph terms levels focus]
+(defn render-graph [fullscreen-graph terms levels control]
   (let [g (->> levels
                (graph/adjacency-list terms)
                (graph/graph))
@@ -63,24 +63,24 @@
             <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
             </marker>"}})
       (apply dom/g #js {:className "nodes"}
-        (map #(render-node g % (.node layout %) focus)
+        (map #(render-node g % (.node layout %) control)
              (.nodes layout)))
       (apply dom/g #js {:className "edges"}
         (map #(render-edge layout %)
              (.edges layout))))))
 
-(defn handle-term-click [focus term-state]
-  (put! focus (:uuid term-state)))
+(defn handle-term-click [control term-state]
+  (put! control [:focus (:uuid term-state)]))
 
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
 
-(defn colorize-word [terms focus word]
+(defn colorize-word [terms control word]
   (let [lc-word (string/lower-case word)]
     (cond (and terms (find-term terms lc-word))
           (dom/span #js {:className "defined"
                          :onClick #(handle-term-click
-                                    focus
+                                    control
                                     (find-term terms lc-word))}
                     word)
 
@@ -185,8 +185,8 @@
   (reify
     om/IRenderState
     (render-state [this {:keys [level-idx terms
-                                focus drop-on
-                                inspect delete-definition]}]
+                                control drop-on
+                                delete-definition]}]
       (dom/div #js {:className "definition"
                     :id (:uuid definition)
                     :onMouseDown
@@ -195,7 +195,7 @@
                                        #(put! delete-definition (:uuid @definition))
                                        drop-on))}
         (dom/button #js {:className "expand"
-                         :onClick #(put! inspect (:uuid @definition))}
+                         :onClick #(put! control [:inspect (:uuid @definition)])}
                     "i")
         (dom/input #js {:type "text" :placeholder "Term"
                         :className "term"
@@ -211,7 +211,7 @@
                              :onChange #(handle-meaning-change % owner definition)})
           (apply dom/pre #js {:className "bg"
                               :ref "meaningBg"}
-            (word-map #(colorize-word terms focus %)
+            (word-map #(colorize-word terms control %)
                       (:meaning definition))))))))
 
 ; level view
@@ -223,35 +223,33 @@
   (reify
     om/IInitState
     (init-state [_]
-      {:drop-on (chan)
-       :delete-definition (chan)})
+      {:delete-definition (chan)})
     om/IWillMount
     (will-mount [_]
-      (let [drop-on (om/get-state owner :drop-on)
-            delete-definition (om/get-state owner :delete-definition)
+      (let [delete-definition (om/get-state owner :delete-definition)
             delete-level (om/get-state owner :delete-level)]
-        (go (loop []
-          (let [[uuid dragging-definition position] (<! drop-on)]
-            (om/transact! level
-              (fn [level]
-                (let [splice-idx
-                      (first (keep-indexed
-                              (fn [idx definition]
-                                (if (= (:uuid definition) uuid)
-                                  idx
-                                  nil))
-                              level))]
-                  (js/console.log splice-idx position)
-                  (case position
-                    :above (apply conj
-                                  (subvec level 0 splice-idx)
-                                  dragging-definition
-                                  (subvec level splice-idx))
-                    :below (apply conj
-                                  (subvec level 0 (inc splice-idx))
-                                  dragging-definition
-                                  (subvec level (inc splice-idx)))))))
-            (recur))))
+        ;; (go (loop []
+        ;;   (let [[uuid dragging-definition position] (<! drop-on)]
+        ;;     (om/transact! level
+        ;;       (fn [level]
+        ;;         (let [splice-idx
+        ;;               (first (keep-indexed
+        ;;                       (fn [idx definition]
+        ;;                         (if (= (:uuid definition) uuid)
+        ;;                           idx
+        ;;                           nil))
+        ;;                       level))]
+        ;;           (js/console.log splice-idx position)
+        ;;           (case position
+        ;;             :above (apply conj
+        ;;                           (subvec level 0 splice-idx)
+        ;;                           dragging-definition
+        ;;                           (subvec level splice-idx))
+        ;;             :below (apply conj
+        ;;                           (subvec level 0 (inc splice-idx))
+        ;;                           dragging-definition
+        ;;                           (subvec level (inc splice-idx)))))))
+        ;;     (recur))))
 
         (go (loop []
           (let [uuid (<! delete-definition)]
@@ -262,7 +260,7 @@
                   (vec (concat n (rest m))))))
             (recur))))))
     om/IRenderState
-    (render-state [this {:keys [focus inspect delete-level level-idx terms
+    (render-state [this {:keys [control delete-level level-idx terms
                                 drop-on delete-definition]}]
       (js/console.log "rerender")
       (dom/div #js {:className "level"}
@@ -271,9 +269,7 @@
                                  ;;      :transitionName "defTrans"}
             (om/build-all definition-view level
                           {:key :uuid
-                           :init-state {:focus focus
-                                        :inspect inspect
-                                        :drop-on drop-on
+                           :init-state {:control control
                                         :delete-definition delete-definition}
                            :state {:level-idx level-idx
                                    :terms terms}})))
@@ -297,10 +293,9 @@
 (defn add-level [app]
   (om/transact! app :levels #(conj % [(empty-definition)])))
 
-(defn build-level [app delete-level focus inspect level-idx level]
+(defn build-level [app delete-level control level-idx level]
   (om/build level-view level
-            {:init-state {:focus focus
-                          :inspect inspect
+            {:init-state {:control control
                           :delete-level delete-level}
              :state {:level-idx level-idx
                      :terms (find-terms (take level-idx (:levels app)))}}))
@@ -325,27 +320,22 @@
     (init-state [_]
       {:inspect-id nil
        :fullscreen-graph false
-       :focus (chan)
-       :inspect (chan)
+       :control (chan)
        :delete-level (chan)})
 
     om/IWillMount
     (will-mount [_]
-      (let [focus (om/get-state owner :focus)
-            inspect (om/get-state owner :inspect)
+      (let [control (om/get-state owner :control)
             delete-level (om/get-state owner :delete-level)]
         (go (loop []
-          (let [id (<! focus)]
-            (-> js/document
-                (.getElementById id)
-                (.getElementsByClassName "edit")
-                (aget 0)
-                (.focus))
-            (recur))))
-
-        (go (loop []
-          (let [id (<! inspect)]
-            (om/set-state! owner :inspect-id id)
+          (let [[tag id] (<! control)]
+            (case tag
+              :focus (-> js/document
+                         (.getElementById id)
+                         (.getElementsByClassName "edit")
+                         (aget 0)
+                         (.focus))
+              :inspect (om/set-state! owner :inspect-id id))
             (recur))))
 
         (go (loop []
@@ -356,13 +346,13 @@
 
     om/IRenderState
     (render-state [this {:keys [inspect-id
-                                focus inspect
+                                control
                                 fullscreen-graph
                                 delete-level]}]
       (dom/div #js {:className "app"}
         (dom/div #js {:className "levelsWrapper"}
           (apply dom/div #js {:className "levels"}
-                 (conj (vec (map-indexed #(build-level app delete-level focus inspect
+                 (conj (vec (map-indexed #(build-level app delete-level control
                                                        %1 %2)
                                          (:levels app)))
                        (dom/button #js {:className "addLevel"
@@ -387,7 +377,7 @@
             (render-graph fullscreen-graph
                           (find-terms (:levels app))
                           (:levels app)
-                          focus)
+                          control)
             (dom/div #js {:className "controls"}
               (dom/button #js {:onClick (fn [] 
                                           (docs/save! @app)

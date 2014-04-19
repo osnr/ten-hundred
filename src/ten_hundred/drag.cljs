@@ -1,5 +1,6 @@
 (ns ten-hundred.drag
-  (:require [om.core :as om :include-macros true]))
+  (:require [om.core :as om :include-macros true]
+            [goog.dom.classlist :as classlist]))
 
 (def drag-state
   (atom {:dragging {:clone nil
@@ -13,36 +14,36 @@
            placeholder)}))
 
 (defn drag-start [e definition delete-original! drop-on]
-  (js/console.log "drag-start")
-  (let [current-target (.-currentTarget e)
-        clone (.cloneNode current-target true)
-        data-transfer (.-dataTransfer e)
+  (when (classlist/contains (.-target e) "definition")
+    (let [current-target (.-currentTarget e)
+          clone (.cloneNode current-target true)
+          data-transfer (.-dataTransfer e)
 
-        initial-x (.-offsetLeft current-target)
-        initial-y (.-offsetTop current-target)]
-    (swap! drag-state
-           #(assoc %
-              :dragging
-              {:clone clone
-               :definition definition
-               :offset-x (- (.-clientX e) initial-x)
-               :offset-y (- (.-clientY e) initial-y)
-               :drop-on drop-on}))
-    (set! (.-width (.-style clone))
-          (str (.-width current-target) "px"))
-    (set! (.-height (.-style clone))
-          (str (.-height current-target) "px"))
-    (set! (.-left (.-style clone))
-          (str initial-x "px"))
-    (set! (.-top (.-style clone))
-          (str initial-y "px"))
-    (set! (.-className clone)
-          (str (.-className current-target) " draggingEl"))
-    (.appendChild js/document.body clone)
+          initial-x (.-offsetLeft current-target)
+          initial-y (.-offsetTop current-target)]
+      (swap! drag-state
+             #(assoc %
+                :dragging
+                {:clone clone
+                 :definition definition
+                 :offset-x (- (.-clientX e) initial-x)
+                 :offset-y (- (.-clientY e) initial-y)
+                 :drop-on drop-on}))
+      (set! (.-width (.-style clone))
+            (str (.-width current-target) "px"))
+      (set! (.-height (.-style clone))
+            (str (.-height current-target) "px"))
+      (set! (.-left (.-style clone))
+            (str initial-x "px"))
+      (set! (.-top (.-style clone))
+            (str initial-y "px"))
+      (set! (.-className clone)
+            (str (.-className current-target) " draggingEl"))
+      (.appendChild js/document.body clone)
 
-    (.addEventListener js/document "mousemove" drag-move)
-    (.addEventListener js/document "mouseup" drag-end)
-    (delete-original!)))
+      (.addEventListener js/document "mousemove" drag-move)
+      (.addEventListener js/document "mouseup" drag-end)
+      (delete-original!))))
 
 (defn drag-end [e]
   (let [dragging (:dragging @drag-state)
