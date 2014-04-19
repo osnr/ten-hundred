@@ -53,10 +53,10 @@
     (.removeEventListener js/document "mousemove" drag-move)
     (.removeEventListener js/document "mouseup" drag-end)
 
+    (put! control [:drop-on definition position dest-uuid])
+
     (.removeChild (.-parentNode placeholder) placeholder)
     (.removeChild (.-parentNode clone) clone)
-
-    (put! control [:drop-on definition position dest-uuid])
 
     (swap! drag-state #(dissoc % :dragging))))
 

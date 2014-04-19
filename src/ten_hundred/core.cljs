@@ -189,6 +189,7 @@
     (render-state [this {:keys [level-idx terms
                                 control
                                 delete-definition]}]
+      (js/console.log definition)
       (dom/div #js {:className "definition"
                     :id (:uuid definition)
                     :onMouseDown
@@ -294,26 +295,26 @@
        (first)))
 
 (defn drop-on [levels definition position uuid]
-  (map (fn [level]
-         (if (seq (filter #(= (:uuid %) uuid) level))
-           (let [splice-idx
-                 (first (keep-indexed
-                         (fn [idx defi]
-                           (if (= (:uuid defi) uuid)
-                             idx
-                             nil))
-                         level))]
-             (case position
-               :above (apply conj
-                             (subvec level 0 splice-idx)
-                             definition
-                             (subvec level splice-idx))
-               :below (apply conj
-                             (subvec level 0 (inc splice-idx))
-                             definition
-                             (subvec level (inc splice-idx)))))
-           level))
-   levels))
+  (mapv (fn [level]
+          (if (seq (filter #(= (:uuid %) uuid) level))
+            (let [splice-idx
+                  (first (keep-indexed
+                          (fn [idx defi]
+                            (if (= (:uuid defi) uuid)
+                              idx
+                              nil))
+                          level))]
+              (case position
+                :above (apply conj
+                              (subvec level 0 splice-idx)
+                              definition
+                              (subvec level splice-idx))
+                :below (apply conj
+                              (subvec level 0 (inc splice-idx))
+                              definition
+                              (subvec level (inc splice-idx)))))
+            level))
+        levels))
 
 (defn drop-on-level [levels definition level-idx]
   (assoc levels level-idx (conj (levels level-idx) definition)))
@@ -342,7 +343,7 @@
             [:drop-on definition position dest-uuid]
             (om/transact! app :levels #(drop-on % definition position dest-uuid))
             [:drop-on-level definition level-idx]
-            (om/transact app :levels #(drop-on-level % definition level-idx)))
+            (om/transact! app :levels #(drop-on-level % definition level-idx)))
           (recur))
 
         (go-loop []
