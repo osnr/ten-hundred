@@ -245,16 +245,16 @@
     om/IRenderState
     (render-state [this {:keys [control delete-level level-idx terms
                                 delete-definition]}]
-      (dom/div #js {:className "level"}
-        (when (seq level)
-          (apply dom/div nil ;; #js {:component js/React.DOM.div
-                                 ;;      :transitionName "defTrans"}
-            (om/build-all definition-view level
-                          {:key :uuid
-                           :init-state {:control control
-                                        :delete-definition delete-definition}
-                           :state {:level-idx level-idx
-                                   :terms terms}})))
+      (dom/div #js {:className "level"
+                    :id (str "level_" level-idx)}
+        (apply dom/div nil ;; #js {:component js/React.DOM.div
+                           ;;      :transitionName "defTrans"}
+          (om/build-all definition-view level
+                        {:key :uuid
+                         :init-state {:control control
+                                      :delete-definition delete-definition}
+                         :state {:level-idx level-idx
+                                 :terms terms}}))
         (dom/button #js {:className "addDefinition"
                          :onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"

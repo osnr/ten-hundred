@@ -1,6 +1,7 @@
 (ns ten-hundred.drag
   (:require [om.core :as om :include-macros true]
             [cljs.core.async :refer [put!]]
+            [clojure.string :as string]
             [goog.dom :as dom]
             [goog.dom.classlist :as classlist]))
 
@@ -62,6 +63,8 @@
         current-x (.-clientX e)
         current-y (.-clientY e)
 
+        placeholder (:placeholder @drag-state)
+
         target (.-target e)]
     (set! (.-left (.-style clone))
           (str (- current-x offset-x) "px"))
@@ -70,8 +73,6 @@
 
     (if-let [dest-target (dom/getAncestorByClass target target-class)]
       (let [parent (.-parentNode dest-target)
-
-            placeholder (:placeholder @drag-state)
 
             bounding-rect (.getBoundingClientRect dest-target)
             from-top (js/Math.abs (- (.-top bounding-rect) current-y))
@@ -92,10 +93,10 @@
       (when-let [parent (and (not (classlist/contains target "clone"))
                              (not (classlist/contains target "placeholder"))
                              (dom/getAncestorByClass target target-parent-class))]
-        (js/console.log "dest level" (.-id parent))
+        (.appendChild (.-firstChild parent) placeholder)
         (swap! drag-state
                #(assoc-in % [:dragging :drop-place]
-                          {:dest-idx (.-id parent)}))))))
+                          {:dest-idx (js/parseInt (last (string/split (.-id parent) #"_")))}))))))
 
 (defn drag-end [e]
   (let [{:keys [clone data drop-place listeners control]} (:dragging @drag-state)

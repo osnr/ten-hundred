@@ -37,6 +37,8 @@ body {
     vertical-align: top;
     display: inline-block;
     margin-right: 20px;
+
+    min-width: 434px;
 }
 .deleteLevel {
     width: 25px;
