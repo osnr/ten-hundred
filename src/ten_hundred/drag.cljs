@@ -11,8 +11,8 @@
            (set! (.-className placeholder) "placeholder")
            placeholder)}))
 
-(defn drag-start [e target-class data delete-original! control]
-  (when (classlist/contains (.-target e) target-class)
+(defn drag-start [e target-class target-parent-class data delete-original! control]
+  (when (classlist/contains (.-target e) (str target-class "Content"))
     (let [current-target (.-currentTarget e)
           clone (.cloneNode current-target true)
 
@@ -21,7 +21,7 @@
           initial-x (.-offsetLeft current-target)
           initial-y (.-offsetTop current-target)
 
-          listeners {:mousemove #(drag-move % target-class)
+          listeners {:mousemove #(drag-move % target-class target-parent-class)
                      :mouseup drag-end}]
       (swap! drag-state
              #(assoc %
@@ -55,18 +55,20 @@
 
       (.insertBefore (.-parentNode current-target) placeholder (.-nextSibling current-target)))))
 
-(defn drag-move [e target-class]
+(defn drag-move [e target-class target-parent-class]
   (.preventDefault e)
   (let [{:keys [clone offset-x offset-y]} (:dragging @drag-state)
 
         current-x (.-clientX e)
-        current-y (.-clientY e)]
+        current-y (.-clientY e)
+
+        target (.-target e)]
     (set! (.-left (.-style clone))
           (str (- current-x offset-x) "px"))
     (set! (.-top (.-style clone))
           (str (- current-y offset-y) "px"))
 
-    (when-let [dest-target (dom/getAncestorByClass (.-target e) target-class)]
+    (if-let [dest-target (dom/getAncestorByClass target target-class)]
       (let [parent (.-parentNode dest-target)
 
             placeholder (:placeholder @drag-state)
@@ -85,16 +87,23 @@
         (swap! drag-state
                #(assoc-in % [:dragging :drop-place]
                           {:position position
-                           :dest-id (.-id dest-target)}))))))
+                           :dest-id (.-id dest-target)})))
+
+      (when-let [parent (and (not (classlist/contains target "clone"))
+                             (not (classlist/contains target "placeholder"))
+                             (dom/getAncestorByClass target target-parent-class))]
+        (js/console.log "dest level" (.-id parent))
+        (swap! drag-state
+               #(assoc-in % [:dragging :drop-place]
+                          {:dest-idx (.-id parent)}))))))
 
 (defn drag-end [e]
   (let [{:keys [clone data drop-place listeners control]} (:dragging @drag-state)
-        {:keys [position dest-id]} drop-place
         placeholder (:placeholder @drag-state)]
     (.removeEventListener js/document "mousemove" (:mousemove listeners))
     (.removeEventListener js/document "mouseup" (:mouseup listeners))
 
-    (put! control [:drop-on data position dest-id])
+    (put! control [:drop-on data drop-place])
 
     (js/window.setTimeout #(.removeChild (.-parentNode placeholder) placeholder) 0)
     (.removeChild (.-parentNode clone) clone)

@@ -195,28 +195,30 @@
                     (fn [e]
                       (drag/drag-start e
                                        "definition"
+                                       "level"
                                        @definition
                                        #(put! delete-definition (:uuid @definition))
                                        control))}
-        (dom/button #js {:className "expand"
-                         :onClick #(put! control [:inspect (:uuid @definition)])}
-                    "i")
-        (dom/input #js {:type "text" :placeholder "Term"
-                        :className "term"
-                        :value (:term definition)
-                        :onChange #(handle-term-change % definition)})
-        (dom/button #js {:className "remove"
-                         :onClick #(put! delete-definition (:uuid @definition))}
-                    "x")
-        (dom/div #js {:className "meaning"}
-          (dom/textarea #js {:className "edit"
-                             :ref "meaningEdit"
-                             :value (:meaning definition)
-                             :onChange #(handle-meaning-change % owner definition)})
-          (apply dom/pre #js {:className "bg"
-                              :ref "meaningBg"}
-            (word-map #(colorize-word terms control %)
-                      (:meaning definition))))))))
+        (dom/div #js {:className "definitionContent"}
+          (dom/button #js {:className "expand"
+                           :onClick #(put! control [:inspect (:uuid @definition)])}
+                      "i")
+          (dom/input #js {:type "text" :placeholder "Term"
+                          :className "term"
+                          :value (:term definition)
+                          :onChange #(handle-term-change % definition)})
+          (dom/button #js {:className "remove"
+                           :onClick #(put! delete-definition (:uuid @definition))}
+                      "x")
+          (dom/div #js {:className "meaning"}
+            (dom/textarea #js {:className "edit"
+                               :ref "meaningEdit"
+                               :value (:meaning definition)
+                               :onChange #(handle-meaning-change % owner definition)})
+            (apply dom/pre #js {:className "bg"
+                                :ref "meaningBg"}
+              (word-map #(colorize-word terms control %)
+                        (:meaning definition)))))))))
 
 ; level view
 (defn add-definition [level]
@@ -340,10 +342,15 @@
                          (aget 0)
                          (.focus))
             [:inspect id] (om/set-state! owner :inspect-id id)
-            [:drop-on definition position dest-uuid]
-            (om/transact! app :levels #(drop-on % definition position dest-uuid))
-            [:drop-on-level definition level-idx]
-            (om/transact! app :levels #(drop-on-level % definition level-idx)))
+
+            [:drop-on definition {:position position
+                                  :dest-id dest-id}]
+            (om/transact! app :levels #(drop-on % definition position dest-id))
+
+            [:drop-on definition {:dest-idx dest-idx}]
+            (do
+              (js/console.log "drop on level" dest-idx)
+              (om/transact! app :levels #(drop-on-level % definition dest-idx))))
           (recur))
 
         (go-loop []
