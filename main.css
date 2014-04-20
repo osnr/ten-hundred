@@ -15,10 +15,14 @@ body {
     padding-left: 20px;
 
     margin-right: 400px;
+
     height: 100%;
-    overflow: scroll;
+    overflow: auto;
 
     position: relative;
+}
+.levels.minimizeSidebar {
+    margin-right: 0;
 }
 .addLevel {
 
@@ -29,6 +33,9 @@ body {
     width: 400px;
     margin-left: -400px;
     height: 100%;
+}
+.sidebar.minimize {
+    display: none;
 }
 
 /* level */
@@ -57,6 +64,8 @@ body {
     padding-left: 1em;
     padding-right: 1em;
     background-color: rgba(128, 128, 128, 0.2);
+
+    cursor: move;
 }
 .definition.clone {
     position: absolute;
@@ -193,7 +202,7 @@ body {
     cursor: pointer;
 }
 .controls {
-    position: absolute;
+    position: fixed;
     bottom: 0;
     right: 0;
 }

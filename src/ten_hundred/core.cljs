@@ -326,6 +326,7 @@
     om/IInitState
     (init-state [_]
       {:inspect-id nil
+       :minimize-sidebar false
        :fullscreen-graph false
        :control (chan)
        :delete-level (chan)})
@@ -362,11 +363,14 @@
     om/IRenderState
     (render-state [this {:keys [inspect-id
                                 control
+                                minimize-sidebar
                                 fullscreen-graph
                                 delete-level]}]
       (dom/div #js {:className "app"}
         (dom/div #js {:className "levelsWrapper"}
-          (apply dom/div #js {:className "levels"}
+          (apply dom/div #js {:className (str "levels"
+                                              (when minimize-sidebar
+                                                " minimizeSidebar"))}
                  (conj (vec (map-indexed #(build-level app delete-level control
                                                        %1 %2)
                                          (:levels app)))
@@ -374,7 +378,9 @@
                                         :onClick #(add-level app)}
                                    "+level"))))
 
-        (dom/div #js {:className "sidebar"}
+        (dom/div #js {:className (str "sidebar"
+                                      (when minimize-sidebar
+                                        " minimize"))}
           (when inspect-id
             (let [[level-idx definition] (find-definition (:levels app) inspect-id)]
               (om/build definition-expansion-view
@@ -392,18 +398,23 @@
             (render-graph fullscreen-graph
                           (find-terms (:levels app))
                           (:levels app)
-                          control)
-            (dom/div #js {:className "controls"}
-              (dom/button #js {:onClick 
-                               (fn [] 
-                                 (docs/save! @app)
-                                 false)}
-                          "save")
-              (dom/button #js {:onClick
-                               (fn []
-                                 (js/window.open "https://github.com/osnr/ten-hundred")
-                                 false)}
-                          "about"))))))))
+                          control)))
+
+        (dom/div #js {:className "controls"}
+          (dom/button #js {:onClick 
+                           (fn [] 
+                             (docs/save! @app)
+                             false)}
+                      "save")
+          (dom/button #js {:onClick
+                           (fn []
+                             (js/window.open "https://github.com/osnr/ten-hundred")
+                             false)}
+                      "about")
+          (dom/button #js {:onClick #(om/update-state! owner :minimize-sidebar not)}
+                      (if minimize-sidebar
+                        "^"
+                        "v")))))))
 
 (defn init-root [app-state]
   (js/window.history.replaceState "" ""

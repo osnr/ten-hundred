@@ -54,7 +54,10 @@
       (.addEventListener js/document "mouseup" (:mouseup listeners))
       (delete-original!)
 
-      (.insertBefore (.-parentNode current-target) placeholder (.-nextSibling current-target)))))
+      (js/window.setTimeout #(.insertBefore (.-parentNode current-target)
+                                            placeholder
+                                            (.-nextSibling current-target))
+                            0))))
 
 (defn drag-move [e target-class target-parent-class]
   (.preventDefault e)
