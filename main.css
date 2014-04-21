@@ -47,6 +47,9 @@ body {
 
     min-width: 434px;
 }
+.levelContent {
+    padding-bottom: 40px;
+}
 .deleteLevel {
     width: 25px;
     float: right;
@@ -67,14 +70,10 @@ body {
 
     cursor: move;
 }
-.definition.clone {
+
+.clone {
     position: absolute;
     pointer-events: none;
-}
-
-.placeholder {
-    height: 180px;
-    width: 100%;
 }
 
 .defTrans-enter {

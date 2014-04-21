@@ -195,6 +195,7 @@
                     (fn [e]
                       (drag/drag-start e
                                        "definition"
+                                       :y
                                        "level"
                                        @definition
                                        #(put! delete-definition (:uuid @definition))
@@ -246,19 +247,30 @@
     (render-state [this {:keys [control delete-level level-idx terms
                                 delete-definition]}]
       (dom/div #js {:className "level"
-                    :id (str "level_" level-idx)}
-        (apply dom/div nil ;; #js {:component js/React.DOM.div
-                           ;;      :transitionName "defTrans"}
-          (om/build-all definition-view level
-                        {:key :uuid
-                         :init-state {:control control
-                                      :delete-definition delete-definition}
-                         :state {:level-idx level-idx
-                                 :terms terms}}))
-        (dom/button #js {:className "addDefinition"
-                         :onClick #(add-definition level)} "+def")
-        (dom/button #js {:className "deleteLevel"
-                         :onClick #(put! delete-level @level)} "x")))))
+                    :id (str "level_" level-idx)
+                    :onMouseDown
+                    (fn [e]
+                      (js/console.log "md")
+                      (drag/drag-start e
+                                       "level"
+                                       :x
+                                       nil
+                                       @level
+                                       #(put! delete-level level-idx)
+                                       control))}
+        (dom/div #js {:className "levelContent"}
+          (apply dom/div nil ;; #js {:component js/React.DOM.div
+                             ;;      :transitionName "defTrans"}
+            (om/build-all definition-view level
+                          {:key :uuid
+                           :init-state {:control control
+                                        :delete-definition delete-definition}
+                           :state {:level-idx level-idx
+                                   :terms terms}}))
+          (dom/button #js {:className "addDefinition"
+                           :onClick #(add-definition level)} "+def")
+          (dom/button #js {:className "deleteLevel"
+                           :onClick #(put! delete-level level-idx)} "x"))))))
 
 ; whole-app view and graph pane
 (defn find-terms [levels]
@@ -296,10 +308,16 @@
        (filter identity)
        (first)))
 
+(defn- insert [vs idx v]
+  (apply conj
+         (subvec vs 0 idx)
+         v
+         (subvec vs idx)))
+
 (defn drop-on [levels definition position uuid]
   (mapv (fn [level]
           (if (seq (filter #(= (:uuid %) uuid) level))
-            (let [splice-idx
+            (let [target-idx
                   (first (keep-indexed
                           (fn [idx defi]
                             (if (= (:uuid defi) uuid)
@@ -307,14 +325,8 @@
                               nil))
                           level))]
               (case position
-                :above (apply conj
-                              (subvec level 0 splice-idx)
-                              definition
-                              (subvec level splice-idx))
-                :below (apply conj
-                              (subvec level 0 (inc splice-idx))
-                              definition
-                              (subvec level (inc splice-idx)))))
+                :before (insert level target-idx definition)
+                :after (insert level (inc target-idx) definition)))
             level))
         levels))
 
@@ -344,20 +356,27 @@
                          (.focus))
             [:inspect id] (om/set-state! owner :inspect-id id)
 
-            [:drop-on definition {:position position
+            [:drop-on "level" level {:position position
+                                     :dest-id dest-id}]
+            (om/transact! app :levels #(insert %
+                                               (case position
+                                                 :before dest-id
+                                                 :after (inc dest-id))
+                                               level))
+
+            [:drop-on "definition" definition {:position position
                                   :dest-id dest-id}]
             (om/transact! app :levels #(drop-on % definition position dest-id))
 
-            [:drop-on definition {:dest-idx dest-idx}]
-            (do
-              (js/console.log "drop on level" dest-idx)
-              (om/transact! app :levels #(drop-on-level % definition dest-idx))))
+            [:drop-on "definition" definition {:dest-idx dest-idx}]
+            (om/transact! app :levels #(drop-on-level % definition dest-idx)))
           (recur))
 
         (go-loop []
-          (let [level (<! delete-level)]
+          (let [level-idx (<! delete-level)]
             (om/transact! app :levels
-                          (fn [levels] (vec (remove #(= level %) levels))))
+                          (fn [levels] (vec (concat (subvec levels 0 level-idx)
+                                                    (subvec levels (inc level-idx))))))
             (recur)))))
 
     om/IRenderState
@@ -368,15 +387,16 @@
                                 delete-level]}]
       (dom/div #js {:className "app"}
         (dom/div #js {:className "levelsWrapper"}
-          (apply dom/div #js {:className (str "levels"
-                                              (when minimize-sidebar
-                                                " minimizeSidebar"))}
-                 (conj (vec (map-indexed #(build-level app delete-level control
-                                                       %1 %2)
-                                         (:levels app)))
-                       (dom/button #js {:className "addLevel"
-                                        :onClick #(add-level app)}
-                                   "+level"))))
+          (dom/div #js {:className (str "levels"
+                                        (when minimize-sidebar
+                                          " minimizeSidebar"))}
+            (apply dom/div nil
+              (vec (map-indexed #(build-level app delete-level control
+                                              %1 %2)
+                                (:levels app))))
+            (dom/button #js {:className "addLevel"
+                             :onClick #(add-level app)}
+                        "+level")))
 
         (dom/div #js {:className (str "sidebar"
                                       (when minimize-sidebar
