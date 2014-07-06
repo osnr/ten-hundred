@@ -8,7 +8,8 @@
             [clojure.string :as string]
             [ten-hundred.dict :as dict]
             [ten-hundred.graph :as graph]
-            [ten-hundred.drag :as drag]
+            [ten-hundred.terms :as terms]
+            [ten-hundred.expansion :as expansion]
             [ten-hundred.docs :as docs]))
 
 (enable-console-print!)
@@ -71,32 +72,6 @@
         (map #(render-edge layout %)
              (.edges layout))))))
 
-(defn handle-term-click [control term-state]
-  (put! control [:focus (:path term-state)]))
-
-(defn find-term [terms token]
-  (last (filter #(= (:term %) token) terms)))
-
-(defn colorize-word [terms control word]
-  (let [lc-word (string/lower-case word)]
-    (cond (and terms (find-term terms lc-word))
-          (dom/span #js {:className "defined"
-                         :onClick #(handle-term-click
-                                    control
-                                    (find-term terms lc-word))}
-                    word)
-
-          (dict/words lc-word) word
-
-          :else (dom/span #js {:className "uncommon"} word))))
-
-(defn word-map [f text]
-  (->> text
-       (re-seq #"[^\w']+|[\w']+")
-       (mapv #(if (re-matches #"[^\w']+" %)
-                %
-                (f %)))))
-
 (defn empty-definition []
   {:term ""
    :meaning ""})
@@ -126,46 +101,6 @@
       :term "cool"
       :meaning "GettysBurg")]])
 
-; definition expansion view
-; 0 -> no expansion
-; 1 -> 1 level deep
-; etc
-(defn expand-word [terms expand-to word]
-  (if-let [{term-level-idx :level-idx
-            term-meaning :meaning}
-           (find-term terms (string/lower-case word))]
-    (if (>= term-level-idx expand-to)
-      (apply dom/span #js {:className "expanded-word"}
-        "["
-        (conj (expand terms expand-to term-meaning)
-              "]"))
-      (dom/span #js {:className "expandable-word"} word))
-    word))
-
-(defn expand [terms expand-to meaning]
-  (word-map #(expand-word terms expand-to %) meaning))
-
-(defn handle-expand-to-change [e owner]
-  (js/console.log (.. e -target -value))
-  (om/set-state! owner :expand-to (.. e -target -value)))
-
-(defn definition-expansion-view [definition owner]
-  (reify
-    om/IRenderState
-    (render-state [this {:keys [level-idx expand-to close terms]}]
-      (dom/div #js {:className "expansion"
-                    :onClick (constantly false)}
-        (dom/input #js {:type "range"
-                        :min 0
-                        :max level-idx
-                        :value expand-to
-                        :onChange #(handle-expand-to-change % owner)})
-        (apply dom/div #js {:className "expanded-meaning"}
-          (expand terms expand-to (:meaning definition)))
-        (dom/button #js {:className "close"
-                         :onClick close}
-                    "x")))))
-
 ; definition view
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
@@ -189,6 +124,7 @@
                                 control
                                 delete-definition]}]
       (dom/div #js {:className "definition"
+                    :id (str "definition_" (string/join "_" path))
 
                     :draggable true
                     :onDragStart (fn []
@@ -213,8 +149,8 @@
                                :onChange #(handle-meaning-change % owner definition)})
             (apply dom/pre #js {:className "bg"
                                 :ref "meaningBg"}
-              (word-map #(colorize-word terms control %)
-                        (:meaning definition)))))))))
+              (terms/word-map #(terms/colorize-word terms control %)
+                              (:meaning definition)))))))))
 
 ; level view
 (defn add-definition [level]
@@ -238,8 +174,7 @@
             delete-level (om/get-state owner :delete-level)]
         (go-loop []
           (let [[_ idx] (<! delete-definition)]
-            (om/transact! level ;; fixme
-                          #(splice % idx))
+            (om/transact! level #(splice % idx))
             (recur)))))
     om/IRenderState
     (render-state [this {:keys [level-idx
@@ -261,18 +196,6 @@
                          :onClick #(put! delete-level @level)} "x")))))
 
 ; whole-app view and graph pane
-(defn find-terms [levels]
-  (apply concat
-    (map-indexed
-     (fn [level-idx level]
-       (->> level
-            (map-indexed (fn [definition-idx {:keys [term meaning]}]
-                           (hash-map :term (string/lower-case term)
-                                     :meaning meaning
-                                     :path [level-idx definition-idx])))
-            (remove #(empty? (:term %)))))
-     levels)))
-
 (defn add-level! [app]
   (om/transact! app #(conj % [(empty-definition)])))
 
@@ -280,21 +203,13 @@
   (om/build level-view level
             {:init-state {:control control
                           :delete-level delete-level}
-             :state {:terms (find-terms (take level-idx levels))}}))
+             :state {:level-idx level-idx
+                     :terms (terms/find-terms (take level-idx levels))}}))
 
 (defn handle-fullscreen-graph [owner fullscreen-graph]
   (om/update-state! owner :fullscreen-graph not))
 
 (defn log-id [x] (js/console.log (pr-str x)) x)
-(defn find-definition [levels uuid]
-  (->> levels
-       (map-indexed
-        (fn [level-idx level]
-          (if-let [definition (first (filter #(= (:uuid %) uuid) level))]
-            [level-idx definition]
-            nil)))
-       (filter identity)
-       (first)))
 
 (defn drop-on [levels definition position uuid]
   (mapv (fn [level]
@@ -341,7 +256,7 @@
         (go-loop []
           (match (<! control)
             [:focus path] (-> js/document
-                              (.getElementById path) ;; fixme
+                              (.getElementById (str "definition_" (string/join "_" path)))
                               (.getElementsByClassName "edit")
                               (aget 0)
                               (.focus))
@@ -392,21 +307,22 @@
                                       (when minimize-sidebar
                                         " minimize"))}
           (when inspect-path
-            (let [[level-idx definition] (find-definition levels inspect-path)]
-              (om/build definition-expansion-view
+            (let [inspect-level-idx (first inspect-path)
+                  definition (get-in levels inspect-path)]
+              (om/build expansion/definition-expansion-view
                         definition
                         {:react-key (str (:uuid definition) "_expansion")
-                         :init-state {:expand-to level-idx
+                         :init-state {:expand-to inspect-level-idx
                                       :close #(om/set-state! owner :inspect-path nil)}
-                         :state {:level-idx level-idx
-                                 :terms (find-terms (take level-idx levels))}})))
+                         :state {:level-idx inspect-level-idx
+                                 :terms (terms/find-terms (take inspect-level-idx levels))}})))
 
           (dom/div #js {:className (str "graph"
                                         (when fullscreen-graph
                                           " fullscreen"))
                         :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
             (render-graph fullscreen-graph
-                          (find-terms levels)
+                          (terms/find-terms levels)
                           levels
                           control)))
 

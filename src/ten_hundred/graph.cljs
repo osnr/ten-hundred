@@ -18,7 +18,6 @@
     (fn [level-idx level]
       (map-indexed
         (fn [definition-idx {:keys [term meaning]}]
-          (println (deps terms level-idx meaning))
           {:path [level-idx definition-idx]
 
            :term term
