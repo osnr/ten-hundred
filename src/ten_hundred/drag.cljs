@@ -38,26 +38,7 @@
 
                  :listeners listeners
                  :control control}))
-      (set! (.-width (.-style clone))
-            (str (.-width current-target) "px"))
-      (set! (.-height (.-style clone))
-            (str (.-height current-target) "px"))
-      (set! (.-left (.-style clone))
-            (str initial-x "px"))
-      (set! (.-top (.-style clone))
-            (str initial-y "px"))
-      (set! (.-className clone)
-            (str (.-className current-target) " clone"))
-      (.appendChild (dom/getElementByClass "levels") clone)
-
-      (.addEventListener js/document "mousemove" (:mousemove listeners))
-      (.addEventListener js/document "mouseup" (:mouseup listeners))
-      (delete-original!)
-
-      (js/window.setTimeout #(.insertBefore (.-parentNode current-target)
-                                            placeholder
-                                            (.-nextSibling current-target))
-                            0))))
+      (delete-original!))))
 
 (defn drag-move [e target-class target-parent-class]
   (.preventDefault e)

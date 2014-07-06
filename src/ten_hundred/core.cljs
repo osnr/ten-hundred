@@ -6,7 +6,6 @@
             [cljs.core.async :refer [put! chan <!]]
             [cljs.core.match]
             [clojure.string :as string]
-            [cljs-uuid-utils :as uuid]
             [ten-hundred.dict :as dict]
             [ten-hundred.graph :as graph]
             [ten-hundred.drag :as drag]
@@ -22,11 +21,12 @@
         width (.-width value)
         height (.-height value)
 
+        path (.-path node)
         label (.-label node)]
     (dom/g #js {:transform (str "translate(" (- x (/ width 2))
                                 "," (- y (/ height 2)) ")")}
            (dom/rect #js {:className "nodeRect"
-                          :onClick #(do (put! control [:focus n])
+                          :onClick #(do (put! control [:focus path])
                                         false)
                           :width width
                           :height height})
@@ -72,7 +72,7 @@
              (.edges layout))))))
 
 (defn handle-term-click [control term-state]
-  (put! control [:focus (:uuid term-state)]))
+  (put! control [:focus (:path term-state)]))
 
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
@@ -98,72 +98,70 @@
                 (f %)))))
 
 (defn empty-definition []
-  {:uuid (uuid/uuid-string (uuid/make-random-uuid))
-   :term ""
+  {:term ""
    :meaning ""})
 
 (defn make-example-state []
-  {:id (uuid/uuid-string (uuid/make-random-uuid))
-   :levels [[(assoc (empty-definition)
-               :term "score"
-               :meaning "five times four")
-             (assoc (empty-definition)
-               :term "continent"
-               :meaning "big piece of land")
-             (assoc (empty-definition)
-               :term "nation"
-               :meaning "a people")
-             (assoc (empty-definition)
-               :term "conceived"
-               :meaning "made up")
-             (assoc (empty-definition)
-               :term "proposition"
-               :meaning "an idea that could be right or wrong")]
-            [(assoc (empty-definition)
-               :term "Gettysburg"
-               :meaning (str "Four score and seven years ago our fathers brought forth "
-                             "on this continent, a new nation, conceived in Liberty, "
-                             "and dedicated to the proposition that all men are created equal."))]
-            [(assoc (empty-definition)
-               :term "cool"
-               :meaning "GettysBurg")]]})
+  [[(assoc (empty-definition)
+      :term "score"
+      :meaning "five times four")
+    (assoc (empty-definition)
+      :term "continent"
+      :meaning "big piece of land")
+    (assoc (empty-definition)
+      :term "nation"
+      :meaning "a people")
+    (assoc (empty-definition)
+      :term "conceived"
+      :meaning "made up")
+    (assoc (empty-definition)
+      :term "proposition"
+      :meaning "an idea that could be right or wrong")]
+   [(assoc (empty-definition)
+      :term "Gettysburg"
+      :meaning (str "Four score and seven years ago our fathers brought forth "
+                    "on this continent, a new nation, conceived in Liberty, "
+                    "and dedicated to the proposition that all men are created equal."))]
+   [(assoc (empty-definition)
+      :term "cool"
+      :meaning "GettysBurg")]])
 
 ; definition expansion view
 ; 0 -> no expansion
 ; 1 -> 1 level deep
 ; etc
-(defn expand-word [terms degree word]
+(defn expand-word [terms expand-to word]
   (if-let [{term-level-idx :level-idx
             term-meaning :meaning}
            (find-term terms (string/lower-case word))]
-    (if (>= term-level-idx degree)
+    (if (>= term-level-idx expand-to)
       (apply dom/span #js {:className "expanded-word"}
         "["
-        (conj (expand terms degree term-meaning)
+        (conj (expand terms expand-to term-meaning)
               "]"))
       (dom/span #js {:className "expandable-word"} word))
     word))
 
-(defn expand [terms degree meaning]
-  (word-map #(expand-word terms degree %) meaning))
+(defn expand [terms expand-to meaning]
+  (word-map #(expand-word terms expand-to %) meaning))
 
-(defn handle-degree-change [e owner]
+(defn handle-expand-to-change [e owner]
   (js/console.log (.. e -target -value))
-  (om/set-state! owner :degree (.. e -target -value)))
+  (om/set-state! owner :expand-to (.. e -target -value)))
 
 (defn definition-expansion-view [definition owner]
   (reify
     om/IRenderState
-    (render-state [this {:keys [level-idx degree close terms]}]
+    (render-state [this {:keys [level-idx expand-to close terms]}]
       (dom/div #js {:className "expansion"
                     :onClick (constantly false)}
         (dom/input #js {:type "range"
                         :min 0
                         :max level-idx
-                        :value degree
-                        :onChange #(handle-degree-change % owner)})
+                        :value expand-to
+                        :onChange #(handle-expand-to-change % owner)})
         (apply dom/div #js {:className "expanded-meaning"}
-          (expand terms degree (:meaning definition)))
+          (expand terms expand-to (:meaning definition)))
         (dom/button #js {:className "close"
                          :onClick close}
                     "x")))))
@@ -186,29 +184,27 @@
 (defn definition-view [definition owner]
   (reify
     om/IRenderState
-    (render-state [this {:keys [level-idx terms
+    (render-state [this {:keys [path
+                                terms
                                 control
                                 delete-definition]}]
       (dom/div #js {:className "definition"
-                    :id (:uuid definition)
-                    :onMouseDown
-                    (fn [e]
-                      (drag/drag-start e
-                                       "definition"
-                                       "level"
-                                       @definition
-                                       #(put! delete-definition (:uuid @definition))
-                                       control))}
+
+                    :draggable true
+                    :onDragStart (fn []
+                                   (put! control [:drag-start :definition @definition])
+                                   (put! delete-definition path))
+                    :onDragOver #(put! control [:drag-over :definition path])}
         (dom/div #js {:className "definitionContent"}
           (dom/button #js {:className "expand"
-                           :onClick #(put! control [:inspect (:uuid @definition)])}
+                           :onClick #(put! control [:inspect path])}
                       "i")
           (dom/input #js {:type "text" :placeholder "Term"
                           :className "term"
                           :value (:term definition)
                           :onChange #(handle-term-change % definition)})
           (dom/button #js {:className "remove"
-                           :onClick #(put! delete-definition (:uuid @definition))}
+                           :onClick #(put! delete-definition path)}
                       "x")
           (dom/div #js {:className "meaning"}
             (dom/textarea #js {:className "edit"
@@ -224,37 +220,41 @@
 (defn add-definition [level]
   (om/transact! level #(conj % (empty-definition))))
 
+(defn splice [v idx]
+  (apply conj
+         (subvec v 0 idx)
+         (subvec v (inc idx))))
+
 (def css-trans-group (-> js/React (aget "addons") (aget "CSSTransitionGroup")))
 (defn level-view [level owner]
   (reify
     om/IInitState
     (init-state [_]
       {:delete-definition (chan)})
+
     om/IWillMount
     (will-mount [_]
       (let [delete-definition (om/get-state owner :delete-definition)
             delete-level (om/get-state owner :delete-level)]
         (go-loop []
-          (let [uuid (<! delete-definition)]
-            (js/console.log "delete-definition" uuid)
-            (om/transact! level
-                          (fn [level]
-                            (let [[n m] (split-with #(not= (:uuid %) uuid) level)]
-                              (vec (concat n (rest m))))))
+          (let [[_ idx] (<! delete-definition)]
+            (om/transact! level ;; fixme
+                          #(splice % idx))
             (recur)))))
     om/IRenderState
-    (render-state [this {:keys [control delete-level level-idx terms
+    (render-state [this {:keys [level-idx
+                                control delete-level terms
                                 delete-definition]}]
-      (dom/div #js {:className "level"
-                    :id (str "level_" level-idx)}
+      (dom/div #js {:className "level"}
         (apply dom/div nil ;; #js {:component js/React.DOM.div
                            ;;      :transitionName "defTrans"}
-          (om/build-all definition-view level
-                        {:key :uuid
-                         :init-state {:control control
-                                      :delete-definition delete-definition}
-                         :state {:level-idx level-idx
-                                 :terms terms}}))
+          (map-indexed (fn [definition-idx definition]
+                         (om/build definition-view definition
+                                   {:init-state {:control control
+                                                 :delete-definition delete-definition}
+                                    :state {:path [level-idx definition-idx]
+                                            :terms terms}}))
+                       level))
         (dom/button #js {:className "addDefinition"
                          :onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"
@@ -264,23 +264,23 @@
 (defn find-terms [levels]
   (apply concat
     (map-indexed
-     (fn [idx level]
-       (map #(hash-map :uuid (:uuid %)
-                       :term (string/lower-case (:term %))
-                       :meaning (:meaning %)
-                       :level-idx idx)
-            (remove #(empty? (:term %)) level)))
+     (fn [level-idx level]
+       (->> level
+            (map-indexed (fn [definition-idx {:keys [term meaning]}]
+                           (hash-map :term (string/lower-case term)
+                                     :meaning meaning
+                                     :path [level-idx definition-idx])))
+            (remove #(empty? (:term %)))))
      levels)))
 
-(defn add-level [app]
-  (om/transact! app :levels #(conj % [(empty-definition)])))
+(defn add-level! [app]
+  (om/transact! app #(conj % [(empty-definition)])))
 
-(defn build-level [app delete-level control level-idx level]
+(defn build-level [levels delete-level control level-idx level]
   (om/build level-view level
             {:init-state {:control control
                           :delete-level delete-level}
-             :state {:level-idx level-idx
-                     :terms (find-terms (take level-idx (:levels app)))}}))
+             :state {:terms (find-terms (take level-idx levels))}}))
 
 (defn handle-fullscreen-graph [owner fullscreen-graph]
   (om/update-state! owner :fullscreen-graph not))
@@ -321,13 +321,16 @@
 (defn drop-on-level [levels definition level-idx]
   (assoc levels level-idx (conj (levels level-idx) definition)))
 
-(defn app-view [app owner]
+(defn app-view [levels owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:inspect-id nil
+      {:inspect-path nil
        :minimize-sidebar false
        :fullscreen-graph false
+
+       :dragging nil
+
        :control (chan)
        :delete-level (chan)})
 
@@ -337,31 +340,38 @@
             delete-level (om/get-state owner :delete-level)]
         (go-loop []
           (match (<! control)
-            [:focus id] (-> js/document
-                         (.getElementById id)
-                         (.getElementsByClassName "edit")
-                         (aget 0)
-                         (.focus))
-            [:inspect id] (om/set-state! owner :inspect-id id)
+            [:focus path] (-> js/document
+                              (.getElementById path) ;; fixme
+                              (.getElementsByClassName "edit")
+                              (aget 0)
+                              (.focus))
+            [:inspect path] (om/set-state! owner :inspect-path path)
 
-            [:drop-on definition {:position position
-                                  :dest-id dest-id}]
-            (om/transact! app :levels #(drop-on % definition position dest-id))
+            [:drag-start :definition definition]
+            (om/set-state! owner :dragging {:data definition})
 
-            [:drop-on definition {:dest-idx dest-idx}]
-            (do
-              (js/console.log "drop on level" dest-idx)
-              (om/transact! app :levels #(drop-on-level % definition dest-idx))))
+            [:drag-over :definition :definition target-uuid position]
+            (js/console.log "drag ovah")
+
+            [:drag-over :definition :level target-idx position]
+            (js/console.log "drag ovah")
+
+            [:drag-end :definition :definition target-uuid position]
+            (om/transact! levels #(drop-on % (om/get-state owner :dragging) position target-uuid))
+
+            [:drag-end :definition :level target-idx]
+            (om/transact! levels #(drop-on-level % (om/get-state owner :dragging)) target-idx))
           (recur))
 
         (go-loop []
           (let [level (<! delete-level)]
-            (om/transact! app :levels
+            (om/transact! levels
                           (fn [levels] (vec (remove #(= level %) levels))))
             (recur)))))
 
     om/IRenderState
-    (render-state [this {:keys [inspect-id
+    (render-state [this {:keys [inspect-path
+                                dragging
                                 control
                                 minimize-sidebar
                                 fullscreen-graph
@@ -371,39 +381,39 @@
           (apply dom/div #js {:className (str "levels"
                                               (when minimize-sidebar
                                                 " minimizeSidebar"))}
-                 (conj (vec (map-indexed #(build-level app delete-level control
+                 (conj (vec (map-indexed #(build-level levels delete-level control
                                                        %1 %2)
-                                         (:levels app)))
+                                         levels))
                        (dom/button #js {:className "addLevel"
-                                        :onClick #(add-level app)}
+                                        :onClick #(add-level! levels)}
                                    "+level"))))
 
         (dom/div #js {:className (str "sidebar"
                                       (when minimize-sidebar
                                         " minimize"))}
-          (when inspect-id
-            (let [[level-idx definition] (find-definition (:levels app) inspect-id)]
+          (when inspect-path
+            (let [[level-idx definition] (find-definition levels inspect-path)]
               (om/build definition-expansion-view
                         definition
                         {:react-key (str (:uuid definition) "_expansion")
-                         :init-state {:degree level-idx
-                                      :close #(om/set-state! owner :inspect-id nil)}
+                         :init-state {:expand-to level-idx
+                                      :close #(om/set-state! owner :inspect-path nil)}
                          :state {:level-idx level-idx
-                                 :terms (find-terms (take level-idx (:levels app)))}})))
+                                 :terms (find-terms (take level-idx levels))}})))
 
           (dom/div #js {:className (str "graph"
                                         (when fullscreen-graph
                                           " fullscreen"))
                         :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
             (render-graph fullscreen-graph
-                          (find-terms (:levels app))
-                          (:levels app)
+                          (find-terms levels)
+                          levels
                           control)))
 
         (dom/div #js {:className "controls"}
           (dom/button #js {:onClick 
-                           (fn [] 
-                             (docs/save! @app)
+                           (fn []
+                             (docs/save! @levels)
                              false)}
                       "save")
           (dom/button #js {:onClick

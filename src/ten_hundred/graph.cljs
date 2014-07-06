@@ -13,38 +13,39 @@
        (remove nil?)))
 
 (defn adjacency-list [terms levels]
-  (apply concat (map-indexed
-   (fn [idx level]
-     (map (fn [{:keys [uuid term meaning focus]}]
-            {:uuid uuid
+  (apply concat
+   (map-indexed
+    (fn [level-idx level]
+      (map-indexed
+        (fn [definition-idx {:keys [term meaning]}]
+          (println (deps terms level-idx meaning))
+          {:path [level-idx definition-idx]
 
-             :term term
-             :meaning meaning
+           :term term
+           :meaning meaning
 
-             :deps (deps terms idx meaning)
-             :focus focus
-             :level-idx idx})
-          level))
-   levels)))
+           :deps (deps terms level-idx meaning)})
+        level))
+    levels)))
 
 (defn graph [adj-list]
   (let [g (new js/dagre.Digraph)]
-    (doseq [{:keys [term focus meaning uuid]} adj-list]
+    (doseq [{:keys [term meaning path]} adj-list]
       (let [label (if (empty? term)
                     (str (subs meaning 0 10) "...")
                     term)]
         (.addNode g
-                  uuid
+                  (string/join "." path)
                   #js {:label label
-                       :focus focus
+                       :path path
                        :width (+ 20 (* 8 (count label)))
                        :height 30})))
     (doseq [node adj-list
             dep (:deps node)]
       (.addEdge g
                 nil
-                (:uuid dep)
-                (:uuid node)))
+                (string/join "." (:path dep))
+                (string/join "." (:path node))))
     g))
 
 (defn layout [g]

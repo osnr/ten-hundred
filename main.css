@@ -29,6 +29,8 @@ body {
 }
 
 .sidebar {
+    background-color: rgba(128,128,128,0.1);
+
     float: left;
     width: 400px;
     margin-left: -400px;
@@ -41,6 +43,9 @@ body {
 /* level */
 .level {
     background-color: rgba(128, 128, 128, 0.1);
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+
     vertical-align: top;
     display: inline-block;
     margin-right: 20px;
@@ -56,6 +61,9 @@ body {
 }
 
 /* definition */
+.definition {
+    border-radius: 2px;
+}
 .definitionContent {
     margin-bottom: 1em;
 
@@ -197,7 +205,6 @@ body {
     position: fixed;
     bottom: 0;
     right: 0;
-    background-color: rgba(128,128,128,0.1);
 
     cursor: pointer;
 }
