@@ -153,6 +153,9 @@
                               (:meaning definition)))))))))
 
 ; level view
+(defn placeholder-element []
+  (dom/div #js {:className "placeholder"}))
+
 (defn add-definition [level]
   (om/transact! level #(conj % (empty-definition))))
 
@@ -176,20 +179,27 @@
           (let [[_ idx] (<! delete-definition)]
             (om/transact! level #(splice % idx))
             (recur)))))
+
     om/IRenderState
     (render-state [this {:keys [level-idx
                                 control delete-level terms
+                                drag-target-definition-idx
                                 delete-definition]}]
       (dom/div #js {:className "level"}
         (apply dom/div nil ;; #js {:component js/React.DOM.div
                            ;;      :transitionName "defTrans"}
-          (map-indexed (fn [definition-idx definition]
-                         (om/build definition-view definition
-                                   {:init-state {:control control
-                                                 :delete-definition delete-definition}
-                                    :state {:path [level-idx definition-idx]
-                                            :terms terms}}))
-                       level))
+          (apply concat
+            (map-indexed (fn [definition-idx definition]
+                           (let [definition-element
+                                 (om/build definition-view definition
+                                           {:init-state {:control control
+                                                         :delete-definition delete-definition}
+                                            :state {:path [level-idx definition-idx]
+                                                    :terms terms}})]
+                             (if (= definition-idx drag-target-definition-idx)
+                               [(placeholder-element) definition-element]
+                               [definition-element])))
+                         level)))
         (dom/button #js {:className "addDefinition"
                          :onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"
@@ -199,11 +209,16 @@
 (defn add-level! [app]
   (om/transact! app #(conj % [(empty-definition)])))
 
-(defn build-level [levels delete-level control level-idx level]
+(defn build-level [levels delete-level control
+                   [drag-target-level-idx drag-target-definition-idx]
+                   level-idx level]
   (om/build level-view level
             {:init-state {:control control
                           :delete-level delete-level}
              :state {:level-idx level-idx
+                     :drag-target-definition-idx
+                     (when (= level-idx drag-target-level-idx)
+                       drag-target-definition-idx)
                      :terms (terms/find-terms (take level-idx levels))}}))
 
 (defn handle-fullscreen-graph [owner fullscreen-graph]
@@ -244,7 +259,8 @@
        :minimize-sidebar false
        :fullscreen-graph false
 
-       :dragging nil
+       :dragging {:data nil
+                  :target-path nil}
 
        :control (chan)
        :delete-level (chan)})
@@ -263,12 +279,12 @@
             [:inspect path] (om/set-state! owner :inspect-path path)
 
             [:drag-start :definition definition]
-            (om/set-state! owner :dragging {:data definition})
+            (om/set-state! owner [:dragging :data] definition)
 
-            [:drag-over :definition :definition target-uuid position]
-            (js/console.log "drag ovah")
+            [:drag-over :definition target-path]
+            (om/set-state! owner [:dragging :target-path] target-path)
 
-            [:drag-over :definition :level target-idx position]
+            [:drag-over :definition :level target-idx]
             (js/console.log "drag ovah")
 
             [:drag-end :definition :definition target-uuid position]
@@ -297,6 +313,7 @@
                                               (when minimize-sidebar
                                                 " minimizeSidebar"))}
                  (conj (vec (map-indexed #(build-level levels delete-level control
+                                                       (:target-path dragging)
                                                        %1 %2)
                                          levels))
                        (dom/button #js {:className "addLevel"
