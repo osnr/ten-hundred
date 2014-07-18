@@ -1,12 +1,14 @@
 (ns ten-hundred.graph
-  (:require [clojure.string :as string]))
+  (:require [clojure.string :as string]
+            [om.dom :as dom :include-macros true]
+            [cljs.core.async :refer [put!]]))
 
 (defn deps [terms level-idx meaning]
   (->> meaning
        (re-seq #"[^\w']+|[\w']+")
        (map (fn [token]
               (let [lc-token (string/lower-case token)]
-                (first (filter #(and (< (second (:path %)) level-idx)
+                (first (filter #(and (< (first (:path %)) level-idx)
                                      (= (:term %) lc-token))
                                terms)))))
        (distinct)
@@ -148,3 +150,60 @@
                 (butlast cubic-points)))
          "Q " cplx " " cply " "
          " " lx " " ly)))
+
+(defn render-node [g n value control]
+  (let [node (.node g n)
+        x (.-x value)
+        y (.-y value)
+        width (.-width value)
+        height (.-height value)
+
+        path (.-path node)
+        label (.-label node)]
+    (dom/g #js {:transform (str "translate(" (- x (/ width 2))
+                                "," (- y (/ height 2)) ")")}
+           (dom/rect #js {:className "nodeRect"
+                          :onClick #(do (put! control [:focus path])
+                                        false)
+                          :width width
+                          :height height})
+           (dom/text #js {:className "nodeLabel"
+                          :textAnchor "middle"
+                          :x (/ width 2)
+                          :y (/ height 2)}
+                     label))))
+
+(defn render-edge [layout e]
+  (dom/path #js {:className "dep"
+                 :d (points->svg-path
+                     (calc-points layout e))}))
+
+(defn render-graph [fullscreen-graph terms levels control]
+  (let [g (->> levels
+               (adjacency-list terms)
+               (graph))
+        layout (layout g)
+        value (.-_value layout)
+
+        width (.-width value)
+        height (.-height value)]
+    (dom/svg (if fullscreen-graph
+               #js {:width width
+                    :height height}
+               #js {:width 380
+                    :height 280
+                    :viewBox (str "0 0 "
+                                  width " "
+                                  height)})
+      (js/React.DOM.defs ; <defs> not supported in Om
+       #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
+            "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
+                          refx=\"5\" refy=\"2\" orient=\"auto\">
+            <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
+            </marker>"}})
+      (apply dom/g #js {:className "nodes"}
+        (map #(render-node g % (.node layout %) control)
+             (.nodes layout)))
+      (apply dom/g #js {:className "edges"}
+        (map #(render-edge layout %)
+             (.edges layout))))))

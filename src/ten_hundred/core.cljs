@@ -10,67 +10,10 @@
             [ten-hundred.graph :as graph]
             [ten-hundred.terms :as terms]
             [ten-hundred.expansion :as expansion]
-            [ten-hundred.docs :as docs]))
+            [ten-hundred.docs :as docs]
+            [cljs-uuid-utils]))
 
 (enable-console-print!)
-
-; graph view
-(defn render-node [g n value control]
-  (let [node (.node g n)
-        x (.-x value)
-        y (.-y value)
-        width (.-width value)
-        height (.-height value)
-
-        path (.-path node)
-        label (.-label node)]
-    (dom/g #js {:transform (str "translate(" (- x (/ width 2))
-                                "," (- y (/ height 2)) ")")}
-           (dom/rect #js {:className "nodeRect"
-                          :onClick #(do (put! control [:focus path])
-                                        false)
-                          :width width
-                          :height height})
-           (dom/text #js {:className "nodeLabel"
-                          :textAnchor "middle"
-                          :x (/ width 2)
-                          :y (/ height 2)}
-                     label))))
-
-(defn render-edge [layout e]
-  (dom/path #js {:className "dep"
-                 :d (graph/points->svg-path
-                     (graph/calc-points layout e))}))
-
-(defn render-graph [fullscreen-graph terms levels control]
-  (let [g (->> levels
-               (graph/adjacency-list terms)
-               (graph/graph))
-        layout (graph/layout g)
-        value (.-_value layout)
-
-        width (.-width value)
-        height (.-height value)]
-    (dom/svg (if fullscreen-graph
-               #js {:width width
-                    :height height}
-               #js {:width 380
-                    :height 280
-                    :viewBox (str "0 0 "
-                                  width " "
-                                  height)})
-      (js/React.DOM.defs ; <defs> not supported in Om
-       #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
-            "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
-                          refx=\"5\" refy=\"2\" orient=\"auto\">
-            <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
-            </marker>"}})
-      (apply dom/g #js {:className "nodes"}
-        (map #(render-node g % (.node layout %) control)
-             (.nodes layout)))
-      (apply dom/g #js {:className "edges"}
-        (map #(render-edge layout %)
-             (.edges layout))))))
 
 (defn empty-definition []
   {:term ""
@@ -310,7 +253,8 @@
             (recur)))))
 
     om/IRenderState
-    (render-state [this {:keys [inspect-path
+    (render-state [this {:keys [id
+                                inspect-path
                                 dragging
                                 control
                                 minimize-sidebar
@@ -338,8 +282,7 @@
                   definition (get-in levels inspect-path)]
               (om/build expansion/definition-expansion-view
                         definition
-                        {:react-key (str (:uuid definition) "_expansion")
-                         :init-state {:expand-to inspect-level-idx
+                        {:init-state {:expand-to inspect-level-idx
                                       :close #(om/set-state! owner :inspect-path nil)}
                          :state {:level-idx inspect-level-idx
                                  :terms (terms/find-terms (take inspect-level-idx levels))}})))
@@ -348,15 +291,15 @@
                                         (when fullscreen-graph
                                           " fullscreen"))
                         :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
-            (render-graph fullscreen-graph
-                          (terms/find-terms levels)
-                          levels
-                          control)))
+            (graph/render-graph fullscreen-graph
+                                (terms/find-terms levels)
+                                levels
+                                control)))
 
         (dom/div #js {:className "controls"}
           (dom/button #js {:onClick 
                            (fn []
-                             (docs/save! @levels)
+                             (docs/save! id @levels)
                              false)}
                       "save")
           (dom/button #js {:onClick
@@ -369,24 +312,24 @@
                         "^"
                         "v")))))))
 
-(defn init-root [app-state]
+(defn init-root [id app-state]
   (js/window.history.replaceState "" ""
-                                  (str "#/" (:id app-state)))
+                                  (str "#/" id))
   (js/console.log (pr-str app-state))
   (om/root app-view
            (atom app-state)
-           {:target (. js/document (getElementById "container"))}))
+           {:target (. js/document (getElementById "container"))
+            :init-state {:id id}}))
 
 (defn init []
   (let [id (second (string/split (.-URL js/document) #"#/"))]
     (if (empty? id)
-      (init-root (make-example-state))
+      (init-root (cljs-uuid-utils/uuid-string (cljs-uuid-utils/make-random-uuid))
+                 (make-example-state))
       (docs/load id
                  (fn [loaded-state]
-                   (js/console.log (pr-str loaded-state))
-                   (init-root loaded-state))
+                   (init-root id loaded-state))
                  (fn []
-                   (init-root (assoc (make-example-state)
-                                :id id)))))))
+                   (init-root id (make-example-state)))))))
 
 (init)
