@@ -6,7 +6,7 @@
        (re-seq #"[^\w']+|[\w']+")
        (map (fn [token]
               (let [lc-token (string/lower-case token)]
-                (first (filter #(and (< (:level-idx %) level-idx)
+                (first (filter #(and (< (second (:path %)) level-idx)
                                      (= (:term %) lc-token))
                                terms)))))
        (distinct)
