@@ -239,12 +239,6 @@
                                                (om/get-state owner [:dragging :data])
                                                (om/get-state owner [:dragging :target-path])))
                 (om/set-state! owner :dragging nil))
-
-            [:drag-over :definition :level target-idx]
-            (js/console.log "drag ovah")
-
-            [:drag-end :definition :level target-idx]
-            (om/transact! levels #(drop-on-level % (om/get-state owner :dragging)) target-idx))
           (recur))
 
         (go-loop []
