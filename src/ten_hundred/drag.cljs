@@ -46,9 +46,32 @@
                                    (inc target-level-idx))]
       (put! control [:drag-over final-target-level-idx]))))
 
+(def scroll-timer (atom nil))
 (defn drag-move! [control data-kind e]
   (.preventDefault e)
-  (put! control [:drag-move (.-clientX e) (.-clientY e)])
+  (js/clearInterval @scroll-timer)
+  (let [mouse-x (.-clientX e)
+        mouse-y (.-clientY e)
+
+        viewport (dom/getElementByClass "levels")
+        viewport-bottom (.-offsetHeight viewport)
+        viewport-right (.-offsetWidth viewport)
+
+        scroll-y (cond (< (- viewport-bottom mouse-y) 80) 20
+                       (< mouse-y 30) -20)
+        scroll-x (cond (< (- viewport-right mouse-x) 80) 20
+                       (< mouse-x 30) -20)]
+    (swap! scroll-timer
+           (constantly
+            (js/setInterval
+             (fn []
+               (set! (.-scrollTop viewport)
+                     (+ scroll-y (.-scrollTop viewport)))
+               (set! (.-scrollLeft viewport)
+                     (+ scroll-x (.-scrollLeft viewport))))
+             50)))
+    (put! control [:drag-move mouse-x mouse-y]))
+
   (case data-kind
     :definition (definition-drag-move! control e)
     :level (level-drag-move! control e)))
