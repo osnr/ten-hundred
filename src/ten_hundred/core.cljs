@@ -140,7 +140,8 @@
                                 drag-target-definition-idx
                                 control delete-level terms
                                 delete-definition]}]
-      (dom/div #js {:className "level"}
+      (dom/div #js {:className "level"
+                    :id (str "level_" level-idx)}
         (apply dom/div nil ;; #js {:component js/React.DOM.div
                            ;;      :transitionName "defTrans"}
                (let [definition-elements

@@ -8,7 +8,7 @@
 (defn definition-drag-move! [control e]
   (.preventDefault e)
   (put! control [:drag-move (.-clientX e) (.-clientY e)])
-  (when-let [target (dom/getAncestorByClass (.-target e) "definition")]
+  (if-let [target (dom/getAncestorByClass (.-target e) "definition")]
     (let [mouse-y (.-clientY e)
 
           bounding-rect (.getBoundingClientRect target)
@@ -20,7 +20,14 @@
           target-path (if (< from-top from-bottom)
                         [target-level-idx target-definition-idx]
                         [target-level-idx (inc target-definition-idx)])]
-      (put! control [:drag-over :definition target-path]))))
+      (put! control [:drag-over :definition target-path]))
+    (when (classlist/contains (.-target e) "level")
+      (let [target (.-target e)]
+        (put! control [:drag-over :definition [(-> (.-id target)
+                                                   (string/split #"_")
+                                                   second
+                                                   js/parseFloat)
+                                               0]])))))
 
 (defn definition-drag-end! [control]
   (set! (.-onmousemove js/document) nil)
@@ -28,17 +35,18 @@
   (put! control [:drag-end]))
 
 (defn definition-drag-start! [control definition source-path e]
-  (set! (.-onmousemove js/document) #(definition-drag-move! control %))
-  (set! (.-onmouseup js/document) #(definition-drag-end! control))
-  (let [source (.-target e)
-        viewport (dom/getElementByClass "levels")
+  (when (classlist/contains (.-target e) "definitionContent")
+    (set! (.-onmousemove js/document) #(definition-drag-move! control %))
+    (set! (.-onmouseup js/document) #(definition-drag-end! control))
+    (let [source (.-target e)
+          viewport (dom/getElementByClass "levels")
 
-        mouse-x (.-clientX e)
-        mouse-y (.-clientY e)]
-    (put! control [:drag-start :definition definition source-path
-                   [(- (+ (.-scrollLeft viewport) mouse-x) (.-offsetLeft source))
-                    (- (+ (.-scrollTop viewport) mouse-y) (.-offsetTop source))]
-                   [mouse-x mouse-y]])))
+          mouse-x (.-clientX e)
+          mouse-y (.-clientY e)]
+      (put! control [:drag-start :definition definition source-path
+                     [(- (+ (.-scrollLeft viewport) mouse-x) (.-offsetLeft source))
+                      (- (+ (.-scrollTop viewport) mouse-y) (.-offsetTop source))]
+                     [mouse-x mouse-y]]))))
 
 (def drag-state
   (atom {:dragging nil
