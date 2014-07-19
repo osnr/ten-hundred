@@ -45,6 +45,16 @@
       :term "cool"
       :meaning "GettysBurg")]])
 
+(defn drag-clone-style [drag-clone]
+  (if drag-clone
+    (let [[x y] (:pos drag-clone)]
+      #js {:pointer-events "none"
+           :position "absolute"
+           :left 0
+           :top 0
+           :transform (str "translate(" x "px," y "px)")})
+    #js {}))
+
 ; definition view
 (defn handle-term-change [e definition]
   (om/update! definition :term (.. e -target -value)))
@@ -68,19 +78,12 @@
                                 terms
                                 control
                                 delete-definition]}]
-      (dom/div #js {:className "definition"
-                    :id (str "definition_" (string/join "_" path))
-                    :style (if drag-clone
-                             (let [[x y] (:pos drag-clone)]
-                               #js {:pointer-events "none"
-                                    :position "absolute"
-                                    :left 0
-                                    :top 0
-                                    :transform (str "translate(" x "px," y "px)")})
-                             #js {})
+      (dom/div #js {:className "definitionWrapper"
+                    :style (drag-clone-style drag-clone)
 
-                    :onMouseDown #(drag/definition-drag-start! control @definition path %)}
-        (dom/div #js {:className "definitionContent"}
+                    :onMouseDown #(drag/drag-start! control :definition @definition path %)}
+        (dom/div #js {:className "definition"
+                      :id (str "definition_" (string/join "_" path))}
           (dom/button #js {:className "expand"
                            :onClick #(put! control [:inspect path])}
                       "i")
@@ -102,8 +105,8 @@
                               (:meaning definition)))))))))
 
 ; level view
-(defn placeholder-element []
-  (dom/div #js {:className "placeholder"}))
+(defn placeholder-definition-element []
+  (dom/div #js {:className "placeholderDefinition"}))
 
 (defn add-definition [level]
   (om/transact! level #(conj % (empty-definition))))
@@ -137,31 +140,42 @@
 
     om/IRenderState
     (render-state [this {:keys [level-idx
+                                drag-clone
                                 drag-target-definition-idx
                                 control delete-level terms
                                 delete-definition]}]
       (dom/div #js {:className "level"
-                    :id (str "level_" level-idx)}
-        (apply dom/div nil ;; #js {:component js/React.DOM.div
-                           ;;      :transitionName "defTrans"}
-               (let [definition-elements
-                     (vec (map-indexed (fn [definition-idx definition]
-                                         (om/build definition-view definition
-                                                   {:init-state {:control control
-                                                                 :delete-definition delete-definition}
-                                                    :state {:path [level-idx definition-idx]
-                                                            :terms terms}}))
-                                       level))]
-                 (if drag-target-definition-idx
-                   (insert definition-elements drag-target-definition-idx
-                           (placeholder-element))
-                   definition-elements)))
+                    :id (str "level_" level-idx)
+                    :style (drag-clone-style drag-clone)
+
+                    :onMouseDown #(drag/drag-start! control :level @level level-idx %)}
+        (apply dom/div
+          #js {:className "passthrough"
+               ;; :component js/React.DOM.div
+               ;; :transitionName "defTrans"
+               }
+          (let [definition-elements
+                (vec (map-indexed
+                      (fn [definition-idx definition]
+                        (om/build definition-view definition
+                                  {:init-state {:control control
+                                                :delete-definition delete-definition}
+                                   :state {:path [level-idx definition-idx]
+                                           :terms terms}}))
+                      level))]
+            (if drag-target-definition-idx
+              (insert definition-elements drag-target-definition-idx
+                      (placeholder-definition-element))
+              definition-elements)))
         (dom/button #js {:className "addDefinition"
                          :onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"
                          :onClick #(put! delete-level @level)} "x")))))
 
 ; whole-app view and graph pane
+(defn placeholder-level-element []
+  (dom/div #js {:className "placeholderLevel"}))
+
 (defn add-level! [app]
   (om/transact! app #(conj % [(empty-definition)])))
 
@@ -186,12 +200,9 @@
   (update-in levels [source-level-idx]
              #(splice % source-definition-idx)))
 
-(defn drop-on [levels definition [target-level-idx target-definition-idx]]
+(defn drop-on [levels [target-level-idx target-definition-idx] definition]
   (update-in levels [target-level-idx]
              #(insert % target-definition-idx definition)))
-
-(defn drop-on-level [levels definition level-idx]
-  (assoc levels level-idx (conj (levels level-idx) definition)))
 
 (defn app-view [levels owner]
   (reify
@@ -219,26 +230,31 @@
                               (.focus))
             [:inspect path] (om/set-state! owner :inspect-path path)
 
-            [:drag-start :definition definition source-path offset-pos mouse-pos]
-            (do (om/set-state! owner :dragging {:data definition
+            [:drag-start data-kind data source-path offset-pos mouse-pos]
+            (do (om/set-state! owner :dragging {:data-kind data-kind
+                                                :data data
                                                 :target-path source-path
                                                 :offset-pos offset-pos
                                                 :mouse-pos mouse-pos})
-                (om/transact! levels #(delete-drag-source % source-path)))
+                (case data-kind
+                  :definition (om/transact! levels #(delete-drag-source % source-path))
+                  :level (om/transact! levels #(splice % source-path))))
 
             [:drag-move mouse-x mouse-y]
             (om/set-state! owner [:dragging :mouse-pos] [mouse-x mouse-y])
 
-            [:drag-over :definition target-path]
-            (do (println "drag-over" target-path)
-                (om/set-state! owner [:dragging :target-path] target-path))
+            [:drag-over target-path]
+            (om/set-state! owner [:dragging :target-path] target-path)
 
             [:drag-end]
-            (do (js/console.log "dragend")
-                (om/transact! levels #(drop-on %
-                                               (om/get-state owner [:dragging :data])
-                                               (om/get-state owner [:dragging :target-path])))
-                (om/set-state! owner :dragging nil))
+            (let [{:keys [data-kind data target-path]} (om/get-state owner :dragging)]
+              (case data-kind
+                :definition
+                (om/transact! levels #(drop-on % target-path data))
+                :level
+                (om/transact! levels #(insert % target-path data)))
+              
+              (om/set-state! owner :dragging nil)))
           (recur))
 
         (go-loop []
@@ -260,10 +276,15 @@
           (apply dom/div #js {:className (str "levels"
                                               (when minimize-sidebar
                                                 " minimizeSidebar"))}
-                 (conj (vec (map-indexed #(build-level levels delete-level control
-                                                       (:target-path dragging)
-                                                       %1 %2)
-                                         levels))
+                 (conj (let [level-elements
+                             (vec (map-indexed #(build-level levels delete-level control
+                                                             (when (= (:data-kind dragging) :definition)
+                                                               (:target-path dragging))
+                                                             %1 %2)
+                                               levels))]
+                         (if (= (:data-kind dragging) :level)
+                           (insert level-elements (:target-path dragging) (placeholder-level-element))
+                           level-elements))
                        (dom/button #js {:className "addLevel"
                                         :onClick #(add-level! levels)}
                                    "+level"))))
@@ -309,9 +330,13 @@
         (when dragging
           (let [[mouse-x mouse-y] (:mouse-pos dragging)
                 [offset-x offset-y] (:offset-pos dragging)]
-            (om/build definition-view (:data dragging)
-                      {:state {:drag-clone {:pos [(- mouse-x offset-x)
-                                                  (- mouse-y offset-y)]}}})))))))
+            (case (:data-kind dragging)
+              (om/build (case (:data-kind dragging)
+                          :definition definition-view
+                          :level level-view)
+                        (:data dragging)
+                        {:state {:drag-clone {:pos [(- mouse-x offset-x)
+                                                    (- mouse-y offset-y)]}}}))))))))
 
 (defn init-root [id app-state]
   (js/window.history.replaceState "" ""

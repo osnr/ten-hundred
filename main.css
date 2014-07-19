@@ -51,7 +51,17 @@ body {
     margin-right: 20px;
 
     min-width: 434px;
+
+    cursor: move;
 }
+
+.placeholderLevel {
+    vertical-align: top;
+    display: inline-block;
+    margin-right: 20px;
+    width: 434px;
+}
+
 .deleteLevel {
     width: 25px;
     float: right;
@@ -61,10 +71,10 @@ body {
 }
 
 /* definition */
-.definition {
+.definitionWrapper {
     border-radius: 2px;
 }
-.definitionContent {
+.definition {
     margin-bottom: 1em;
 
     padding-top: 0.5em;
@@ -75,12 +85,8 @@ body {
 
     cursor: move;
 }
-.definition.clone {
-    position: absolute;
-    pointer-events: none;
-}
 
-.placeholder {
+.placeholderDefinition {
     height: 180px;
     width: 100%;
 }
