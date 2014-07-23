@@ -58,9 +58,9 @@
         viewport-right (.-offsetWidth viewport)
 
         scroll-y (cond (< (- viewport-bottom mouse-y) 80) 20
-                       (< mouse-y 30) -20)
+                       (< mouse-y 80) -20)
         scroll-x (cond (< (- viewport-right mouse-x) 80) 20
-                       (< mouse-x 30) -20)]
+                       (< mouse-x 80) -20)]
     (swap! scroll-timer
            (constantly
             (js/setInterval
@@ -77,6 +77,7 @@
     :level (level-drag-move! control e)))
 
 (defn drag-end! [control]
+  (js/clearInterval @scroll-timer)
   (set! (.-onmousemove js/document) nil)
   (set! (.-onmouseup js/document) nil)
   (put! control [:drag-end]))
@@ -93,7 +94,6 @@
       (set! (.-onmousemove js/document) #(drag-move! control data-kind %))
       (set! (.-onmouseup js/document) #(drag-end! control))
       (let [viewport (dom/getElementByClass "levels")
-
             mouse-x (.-clientX e)
             mouse-y (.-clientY e)]
         (put! control [:drag-start data-kind data source-path

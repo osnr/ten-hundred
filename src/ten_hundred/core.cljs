@@ -9,7 +9,7 @@
             [ten-hundred.dict :as dict]
             [ten-hundred.graph :as graph]
             [ten-hundred.terms :as terms]
-            [ten-hundred.expansion :as expansion]
+            [ten-hundred.author :as author]
             [ten-hundred.drag :as drag]
             [ten-hundred.docs :as docs]
             [cljs-uuid-utils]))
@@ -47,12 +47,16 @@
 
 (defn drag-clone-style [drag-clone]
   (if drag-clone
-    (let [[x y] (:pos drag-clone)]
+    (let [[x y] (:pos drag-clone)
+          transform (str "translate(" x "px," y "px)")]
       #js {:pointer-events "none"
            :position "absolute"
            :left 0
            :top 0
-           :transform (str "translate(" x "px," y "px)")})
+           :-webkit-transform transform
+           :-moz-transform transform
+           :-ms-transform transform
+           :transform transform })
     #js {}))
 
 ; definition view
@@ -61,7 +65,7 @@
 
 (defn handle-meaning-change [e owner definition]
   (let [textarea (.-target e)
-        bg (om/get-node owner "meaningBg")]
+        bg (om/get-node owner "bg")]
     (js/window.setTimeout 
      (fn [_]
        (let [height (str (.-scrollHeight textarea) "px")]
@@ -96,11 +100,10 @@
                       "x")
           (dom/div #js {:className "meaning"}
             (dom/textarea #js {:className "edit"
-                               :ref "meaningEdit"
                                :value (:meaning definition)
                                :onChange #(handle-meaning-change % owner definition)})
             (apply dom/pre #js {:className "bg"
-                                :ref "meaningBg"}
+                                :ref "bg"}
               (terms/word-map #(terms/colorize-word terms control %)
                               (:meaning definition)))))))))
 
@@ -208,8 +211,9 @@
   (reify
     om/IInitState
     (init-state [_]
-      {:inspect-path nil
-       :minimize-sidebar false
+      {:mode :author
+
+       :inspect-path [0 0]
        :fullscreen-graph false
 
        :dragging nil
@@ -265,67 +269,63 @@
 
     om/IRenderState
     (render-state [this {:keys [id
+                                mode
                                 inspect-path
                                 dragging
                                 control
-                                minimize-sidebar
                                 fullscreen-graph
                                 delete-level]}]
       (dom/div #js {:className "app"}
-        (dom/div #js {:className "levelsWrapper"}
-          (apply dom/div #js {:className (str "levels"
-                                              (when minimize-sidebar
-                                                " minimizeSidebar"))}
-                 (conj (let [level-elements
-                             (vec (map-indexed #(build-level levels delete-level control
-                                                             (when (= (:data-kind dragging) :definition)
-                                                               (:target-path dragging))
-                                                             %1 %2)
-                                               levels))]
-                         (if (= (:data-kind dragging) :level)
-                           (insert level-elements (:target-path dragging) (placeholder-level-element))
-                           level-elements))
-                       (dom/button #js {:className "addLevel"
-                                        :onClick #(add-level! levels)}
-                                   "+level"))))
+        (dom/div #js {:className "topBar"}
+          (dom/div #js {:className "tabs"}
+            (dom/button #js {:onClick #(om/set-state! owner :mode :author)} "authoring")
+            (dom/button #js {:onClick #(om/set-state! owner :mode :levels)} "levels"))
 
-        (dom/div #js {:className (str "sidebar"
-                                      (when minimize-sidebar
-                                        " minimize"))}
-          (when inspect-path
-            (let [inspect-level-idx (first inspect-path)
-                  definition (get-in levels inspect-path)]
-              (om/build expansion/definition-expansion-view
-                        definition
-                        {:init-state {:expand-to inspect-level-idx
-                                      :close #(om/set-state! owner :inspect-path nil)}
-                         :state {:level-idx inspect-level-idx
-                                 :terms (terms/find-terms (take inspect-level-idx levels))}})))
+          (dom/div #js {:className "controls"}
+            (dom/button #js {:onClick #(docs/save! id @levels)} "save")
+            (dom/button #js {:onClick #(js/window.open "https://github.com/osnr/ten-hundred")}
+                        "about")))
 
-          (dom/div #js {:className (str "graph"
-                                        (when fullscreen-graph
-                                          " fullscreen"))
-                        :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
-            (graph/render-graph fullscreen-graph
-                                (terms/find-terms levels)
-                                levels
-                                control)))
+        (let [[inspect-level-idx inspect-definition-idx] inspect-path]
+          (dom/div #js {:className "viewport"
+                        :style #js {:display (if (= mode :author)
+                                               ""
+                                               "none")}}
+            (om/build author/author-view
+                      (-> levels
+                          (get inspect-level-idx)
+                          (get inspect-definition-idx))
+                      {:init-state {:control control
+                                    :expand-to inspect-level-idx}
+                       :state {:level-idx inspect-level-idx
+                               :terms (terms/find-terms (take inspect-level-idx levels))}})))
 
-        (dom/div #js {:className "controls"}
-          (dom/button #js {:onClick 
-                           (fn []
-                             (docs/save! id @levels)
-                             false)}
-                      "save")
-          (dom/button #js {:onClick
-                           (fn []
-                             (js/window.open "https://github.com/osnr/ten-hundred")
-                             false)}
-                      "about")
-          (dom/button #js {:onClick #(om/update-state! owner :minimize-sidebar not)}
-                      (if minimize-sidebar
-                        "^"
-                        "v")))
+        (apply dom/div #js {:className "viewport levels"
+                            :style #js {:display (if (= mode :levels)
+                                                   ""
+                                                   "none")}}
+          (conj (let [level-elements
+                      (vec (map-indexed
+                            #(build-level levels delete-level control
+                                          (when (= (:data-kind dragging) :definition)
+                                            (:target-path dragging))
+                                          %1 %2)
+                            levels))]
+                  (if (= (:data-kind dragging) :level)
+                    (insert level-elements (:target-path dragging) (placeholder-level-element))
+                    level-elements))
+                (dom/button #js {:className "addLevel"
+                                 :onClick #(add-level! levels)}
+                            "+level")))
+
+        (dom/div #js {:className (str "graph"
+                                      (when fullscreen-graph
+                                        " fullscreen"))
+                      :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
+                 (graph/render-graph fullscreen-graph
+                                     (terms/find-terms levels)
+                                     levels
+                                     control))
 
         (when dragging
           (let [[mouse-x mouse-y] (:mouse-pos dragging)
