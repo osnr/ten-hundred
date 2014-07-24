@@ -1,7 +1,9 @@
 (ns ten-hundred.graph
-  (:require [clojure.string :as string]
+  (:require [om.core :as om :include-macros true]
             [om.dom :as dom :include-macros true]
-            [cljs.core.async :refer [put!]]))
+            [clojure.string :as string]
+            [cljs.core.async :refer [put!]]
+            [ten-hundred.terms :as terms]))
 
 (defn deps [terms level-idx meaning]
   (->> meaning
@@ -151,7 +153,8 @@
          "Q " cplx " " cply " "
          " " lx " " ly)))
 
-(defn render-node [g n value control]
+(defn render-node [author-path control
+                   g n value]
   (let [node (.node g n)
         x (.-x value)
         y (.-y value)
@@ -161,9 +164,13 @@
         path (.-path node)
         label (.-label node)]
     (dom/g #js {:transform (str "translate(" (- x (/ width 2))
-                                "," (- y (/ height 2)) ")")}
+                                "," (- y (/ height 2)) ")")
+                :className (if (= author-path path)
+                             "authoring node"
+                             "node")
+                :key path}
            (dom/rect #js {:className "nodeRect"
-                          :onClick #(do (put! control [:focus path])
+                          :onClick #(do (put! control [:author path])
                                         false)
                           :width width
                           :height height})
@@ -175,35 +182,40 @@
 
 (defn render-edge [layout e]
   (dom/path #js {:className "dep"
-                 :d (points->svg-path
-                     (calc-points layout e))}))
+                 :d (points->svg-path (calc-points layout e))}))
 
-(defn render-graph [fullscreen-graph terms levels control]
-  (let [g (->> levels
-               (adjacency-list terms)
-               (graph))
-        layout (layout g)
-        value (.-_value layout)
+(defn graph-view [levels owner]
+  (reify
+    om/IRenderState
+    (render-state [this {:keys [fullscreen-graph author-path control]}]
+      (let [terms (terms/find-terms levels)
 
-        width (.-width value)
-        height (.-height value)]
-    (dom/svg (if fullscreen-graph
-               #js {:width width
-                    :height height}
-               #js {:width 380
-                    :height 280
-                    :viewBox (str "0 0 "
-                                  width " "
-                                  height)})
-      (js/React.DOM.defs ; <defs> not supported in Om
-       #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
-            "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
+            g (->> levels
+                   (adjacency-list terms)
+                   (graph))
+            layout (layout g)
+            value (.-_value layout)
+
+            width (.-width value)
+            height (.-height value)]
+        (dom/svg (if fullscreen-graph
+                   #js {:width width
+                        :height height}
+                   #js {:width 380
+                        :height 280
+                        :viewBox (str "0 0 "
+                                      width " "
+                                      height)})
+                 (js/React.DOM.defs ; <defs> not supported in Om
+                  #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
+                                                     "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
                           refx=\"5\" refy=\"2\" orient=\"auto\">
             <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
             </marker>"}})
-      (apply dom/g #js {:className "nodes"}
-        (map #(render-node g % (.node layout %) control)
-             (.nodes layout)))
-      (apply dom/g #js {:className "edges"}
-        (map #(render-edge layout %)
-             (.edges layout))))))
+                 (apply dom/g #js {:className "nodes"}
+                        (map #(render-node author-path control
+                                           g % (.node layout %))
+                             (.nodes layout)))
+                 (apply dom/g #js {:className "edges"}
+                        (map #(render-edge layout %)
+                             (.edges layout))))))))

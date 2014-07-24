@@ -88,9 +88,6 @@
                     :onMouseDown #(drag/drag-start! control :definition @definition path %)}
         (dom/div #js {:className "definition"
                       :id (str "definition_" (string/join "_" path))}
-          (dom/button #js {:className "expand"
-                           :onClick #(put! control [:inspect path])}
-                      "i")
           (dom/input #js {:type "text" :placeholder "Term"
                           :className "term"
                           :value (:term definition)
@@ -104,7 +101,7 @@
                                :onChange #(handle-meaning-change % owner definition)})
             (apply dom/pre #js {:className "bg"
                                 :ref "bg"}
-              (terms/word-map #(terms/colorize-word terms control %)
+              (terms/word-map #(terms/colorize-word terms %)
                               (:meaning definition)))))))))
 
 ; level view
@@ -213,7 +210,7 @@
     (init-state [_]
       {:mode :author
 
-       :inspect-path [0 0]
+       :author-path [0 0]
        :fullscreen-graph false
 
        :dragging nil
@@ -232,7 +229,7 @@
                               (.getElementsByClassName "edit")
                               (aget 0)
                               (.focus))
-            [:inspect path] (om/set-state! owner :inspect-path path)
+            [:author path] (om/set-state! owner :author-path path)
 
             [:drag-start data-kind data source-path offset-pos mouse-pos]
             (do (om/set-state! owner :dragging {:data-kind data-kind
@@ -270,7 +267,7 @@
     om/IRenderState
     (render-state [this {:keys [id
                                 mode
-                                inspect-path
+                                author-path
                                 dragging
                                 control
                                 fullscreen-graph
@@ -286,19 +283,19 @@
             (dom/button #js {:onClick #(js/window.open "https://github.com/osnr/ten-hundred")}
                         "about")))
 
-        (let [[inspect-level-idx inspect-definition-idx] inspect-path]
+        (let [[author-level-idx author-definition-idx] author-path]
           (dom/div #js {:className "viewport"
                         :style #js {:display (if (= mode :author)
                                                ""
                                                "none")}}
             (om/build author/author-view
                       (-> levels
-                          (get inspect-level-idx)
-                          (get inspect-definition-idx))
+                          (get author-level-idx)
+                          (get author-definition-idx))
                       {:init-state {:control control
-                                    :expand-to inspect-level-idx}
-                       :state {:level-idx inspect-level-idx
-                               :terms (terms/find-terms (take inspect-level-idx levels))}})))
+                                    :expand-to author-level-idx}
+                       :state {:level-idx author-level-idx
+                               :terms (terms/find-terms (take author-level-idx levels))}})))
 
         (apply dom/div #js {:className "viewport levels"
                             :style #js {:display (if (= mode :levels)
@@ -322,10 +319,10 @@
                                       (when fullscreen-graph
                                         " fullscreen"))
                       :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
-                 (graph/render-graph fullscreen-graph
-                                     (terms/find-terms levels)
-                                     levels
-                                     control))
+          (om/build graph/graph-view levels
+                    {:init-state {:control control}
+                     :state {:fullscreen-graph fullscreen-graph
+                             :author-path author-path}}))
 
         (when dragging
           (let [[mouse-x mouse-y] (:mouse-pos dragging)

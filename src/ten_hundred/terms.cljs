@@ -16,24 +16,20 @@
             (remove #(empty? (:term %)))))
      levels)))
 
-(defn handle-term-click [control term-state]
-  (put! control [:focus (:path term-state)]))
-
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
 
-(defn colorize-word [terms control word]
-  (let [lc-word (string/lower-case word)]
-    (cond (and terms (find-term terms lc-word))
+(defn colorize-word [terms word]
+  (let [lc-word (string/lower-case word)
+        term-state (when terms (find-term terms lc-word))]
+    (cond term-state
           (dom/span #js {:className "defined"
-                         :onClick #(handle-term-click
-                                    control
-                                    (find-term terms lc-word))}
+                         :id (str "defined_" (string/join "_" (:path term-state)))}
                     word)
 
           (dict/words lc-word) word
 
-          :else (dom/span #js {:className "uncommon"} word))))
+          :else (dom/span #js {:className "notDefined"} word))))
 
 (defn word-map [f text]
   (->> text
