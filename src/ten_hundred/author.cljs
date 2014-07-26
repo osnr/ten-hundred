@@ -31,7 +31,7 @@
   (let [textarea (.-target e)
         bg (om/get-node owner "bg")]
     (om/set-state! owner :scroll-top (.-scrollTop textarea))
-    (set! (.-scrollTop bg) (.-scrollTop textarea))))
+    (om/set-state! owner :scroll-width (.-scrollWidth textarea))))
 
 (defn handle-meaning-change! [e owner definition]
   (om/update! definition :meaning (.-value (.-target e))))
@@ -42,7 +42,8 @@
 (defn author-view [definition owner]
   (reify
     om/IRenderState
-    (render-state [this {:keys [control level-idx expand-to close terms]}]
+    (render-state [this {:keys [control level-idx expand-to close terms
+                                scroll-top scroll-width]}]
       (dom/div #js {:className "author"}
         (dom/div #js {:className "authorContentWrapper"}
           (dom/div #js {:className "authorContent"}
@@ -50,11 +51,18 @@
               (if (= expand-to level-idx)
                 [(dom/textarea #js {:className "edit"
                                     :ref "edit"
+
+                                    :scrollTop scroll-top
+
                                     :value (:meaning definition)
                                     :onScroll #(handle-scroll! % owner)
                                     :onChange #(handle-meaning-change! % owner definition)})
                  (apply dom/pre #js {:className "bg"
                                      :ref "bg"
+
+                                     :scrollTop scroll-top
+                                     :style #js {:maxWidth scroll-width}
+
                                      :onClick #(handle-bg-click! % owner control)}
                         (terms/word-map #(terms/colorize-word terms %)
                                         (:meaning definition)))]

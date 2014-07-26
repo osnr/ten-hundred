@@ -13,22 +13,51 @@ body {
     background-color: #D9CDB8;
 }
 .tabs {
-    margin-left: 10px;
+    margin-left: 4px;
     float: left;
 }
+.tabs button i {
+    margin-right: 0.5em;
+}
 .tabs button {
-    margin-top: 2px;
-    margin-right: 10px;
-    height: 28px;
+    margin-top: 4px;
+    margin-left: 0;
+    margin-right: 4px;
+    height: 26px;
 
     font-family: 'Helvetica Neue', 'Helvetica', 'Verdana', sans-serif;
     font-size: 13px;
 
-    border: 1px solid black;
+    border-top: 1px solid #D9CDB8;
+    border-left: 1px solid #D9CDB8;
+    border-right: 1px solid #D9CDB8;
+    border-bottom: 0;
+
+    outline: none;
+}
+.tabs button:hover {
+    background-color: #F5F2EB;
+}
+.tabs button.selectedMode {
+    background-color: #88A6AF;
+    border-top: 1px solid #435A66;
+    border-left: 1px solid #435A66;
+    border-right: 1px solid #435A66;
     border-bottom: 0;
 }
+
 .controls {
     float: right;
+}
+.controls button {
+    height: 22px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    margin-right: 4px;
+    margin-left: 0;
+}
+.controls button i {
+    margin-left: 0.5em;
 }
 
 .viewport {
@@ -149,7 +178,6 @@ body {
     position: relative;
     width: 400px;
     height: 150px;
-    overflow: auto;
 }
 .meaning > .bg, .meaning > .edit {
     box-sizing: border-box;
@@ -166,8 +194,6 @@ body {
     margin: 0;
     border: 0;
 
-    overflow: hidden;
-
     outline: none;
     background-color: rgba(0,0,0,0);
 }
@@ -181,12 +207,29 @@ body {
     user-select: none;
 
     overflow: hidden;
+    padding-bottom: 40px; /* because newlines at end of bg don't show up.. */
 }
 .meaning > .bg span {
     white-space: pre-wrap;
 }
 .meaning > .edit {
 
+}
+.remove {
+    float: right;
+
+    height: 24px;
+
+    margin-right: -3px;
+    border: none;
+    background-color: rgba(0,0,0,0);
+
+    outline: none;
+    cursor: pointer;
+}
+.remove:hover {
+    background-color: #DF594E;
+    color: #F5F2EB;
 }
 
 /* author */
@@ -278,6 +321,9 @@ body {
     width: 300px;
     left: 90px;
 }
+.expandSlider:disabled {
+    opacity: 0.3;
+}
 
 .expandable-word {
     background-color: rgba(0,0,255,0.05);
@@ -286,11 +332,6 @@ body {
 .expanded-word {
     background-color: rgba(0,0,255,0.15);
     transition: all .25s;
-}
-.expansion .close {
-    position: absolute;
-    top: 2em;
-    right: 2em;
 }
 
 /* definition overlay */
@@ -315,6 +356,8 @@ body {
 .graph.fullscreen {
     left: 0;
     top: 0;
+    bottom: 0;
+    right: 0;
     margin: 0 auto;
     background-color: rgba(128,128,128,0.9);
 }
@@ -328,6 +371,23 @@ body {
     position: absolute;
     margin: auto;
     top: 0; left: 0; bottom: 0; right: 0;
+}
+.graphControls {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+.graphControls button {
+    border: none;
+    margin: 0;
+
+    background-color: gray;
+
+    height: 20px;
+    width: 20px;
+}
+.graphControls button:hover {
+    background-color: whitesmoke;
 }
 
 .nodeRect {

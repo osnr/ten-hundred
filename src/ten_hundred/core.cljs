@@ -60,19 +60,17 @@
     #js {}))
 
 ; definition view
-(defn handle-term-change [e definition]
+(defn handle-term-change! [e definition]
   (om/update! definition :term (.. e -target -value)))
 
-(defn handle-meaning-change [e owner definition]
+(defn handle-scroll! [e owner]
   (let [textarea (.-target e)
         bg (om/get-node owner "bg")]
-    (js/window.setTimeout 
-     (fn [_]
-       (let [height (str (.-scrollHeight textarea) "px")]
-         (set! (.-height (.-style textarea)) height)
-         (set! (.-height (.-style bg)) height)))
-     0)
-    (om/update! definition :meaning (.-value textarea))))
+    (om/set-state! owner :scroll-top (.-scrollTop textarea))
+    (om/set-state! owner :scroll-width (.-scrollWidth textarea))))
+
+(defn handle-meaning-change! [e owner definition]
+  (om/update! definition :meaning (.-value (.-target e))))
 
 (defn definition-view [definition owner]
   (reify
@@ -81,7 +79,7 @@
                                 drag-clone
                                 terms
                                 control
-                                delete-definition]}]
+                                scroll-top scroll-width]}]
       (dom/div #js {:className "definitionWrapper"
                     :style (drag-clone-style drag-clone)
 
@@ -91,16 +89,20 @@
           (dom/input #js {:type "text" :placeholder "Term"
                           :className "term"
                           :value (:term definition)
-                          :onChange #(handle-term-change % definition)})
+                          :onChange #(handle-term-change! % definition)})
           (dom/button #js {:className "remove"
-                           :onClick #(put! delete-definition path)}
-                      "x")
+                           :onClick #(put! control [:delete-definition path])}
+                      (dom/i #js {:className "fa fa-times"}))
           (dom/div #js {:className "meaning"}
             (dom/textarea #js {:className "edit"
                                :value (:meaning definition)
-                               :onChange #(handle-meaning-change % owner definition)})
+                               :scrollTop scroll-top
+                               :onScroll #(handle-scroll! % owner)
+                               :onChange #(handle-meaning-change! % owner definition)})
             (apply dom/pre #js {:className "bg"
-                                :ref "bg"}
+                                :ref "bg"
+                                :scrollTop scroll-top
+                                :style #js {:maxWidth scroll-width}}
               (terms/word-map #(terms/colorize-word terms %)
                               (:meaning definition)))))))))
 
@@ -125,25 +127,11 @@
 (def css-trans-group (-> js/React (aget "addons") (aget "CSSTransitionGroup")))
 (defn level-view [level owner]
   (reify
-    om/IInitState
-    (init-state [_]
-      {:delete-definition (chan)})
-
-    om/IWillMount
-    (will-mount [_]
-      (let [delete-definition (om/get-state owner :delete-definition)
-            delete-level (om/get-state owner :delete-level)]
-        (go-loop []
-          (let [[_ idx] (<! delete-definition)]
-            (om/transact! level #(splice % idx))
-            (recur)))))
-
     om/IRenderState
     (render-state [this {:keys [level-idx
                                 drag-clone
                                 drag-target-definition-idx
-                                control delete-level terms
-                                delete-definition]}]
+                                control terms]}]
       (dom/div #js {:className "level"
                     :id (str "level_" level-idx)
                     :style (drag-clone-style drag-clone)
@@ -158,8 +146,7 @@
                 (vec (map-indexed
                       (fn [definition-idx definition]
                         (om/build definition-view definition
-                                  {:init-state {:control control
-                                                :delete-definition delete-definition}
+                                  {:init-state {:control control}
                                    :state {:path [level-idx definition-idx]
                                            :terms terms}}))
                       level))]
@@ -170,7 +157,7 @@
         (dom/button #js {:className "addDefinition"
                          :onClick #(add-definition level)} "+def")
         (dom/button #js {:className "deleteLevel"
-                         :onClick #(put! delete-level @level)} "x")))))
+                         :onClick #(put! control [:delete-level level-idx])} "x")))))
 
 ; whole-app view and graph pane
 (defn placeholder-level-element []
@@ -179,26 +166,28 @@
 (defn add-level! [app]
   (om/transact! app #(conj % [(empty-definition)])))
 
-(defn build-level [levels delete-level control
+(defn build-level [levels control
                    [drag-target-level-idx drag-target-definition-idx]
                    level-idx level]
   (om/build level-view level
-            {:init-state {:control control
-                          :delete-level delete-level}
+            {:init-state {:control control}
              :state {:level-idx level-idx
                      :drag-target-definition-idx
                      (when (= level-idx drag-target-level-idx)
                        drag-target-definition-idx)
                      :terms (terms/find-terms (take level-idx levels))}}))
 
-(defn handle-fullscreen-graph [owner fullscreen-graph]
-  (om/update-state! owner :fullscreen-graph not))
-
 (defn log-id [x] (js/console.log (pr-str x)) x)
 
-(defn delete-drag-source [levels [source-level-idx source-definition-idx]]
-  (update-in levels [source-level-idx]
-             #(splice % source-definition-idx)))
+(defn delete-at! [levels data-kind source-path]
+  (case data-kind
+    :definition
+    (let [[source-level-idx source-definition-idx] source-path]
+      (om/transact! levels source-level-idx
+                    #(splice % source-definition-idx)))
+
+    :level
+    (om/transact! levels #(splice % source-path))))
 
 (defn drop-on [levels [target-level-idx target-definition-idx] definition]
   (update-in levels [target-level-idx]
@@ -211,24 +200,16 @@
       {:mode :author
 
        :author-path [0 0]
-       :fullscreen-graph false
 
        :dragging nil
 
-       :control (chan)
-       :delete-level (chan)})
+       :control (chan)})
 
     om/IWillMount
     (will-mount [_]
-      (let [control (om/get-state owner :control)
-            delete-level (om/get-state owner :delete-level)]
+      (let [control (om/get-state owner :control)]
         (go-loop []
           (match (<! control)
-            [:focus path] (-> js/document
-                              (.getElementById (str "definition_" (string/join "_" path)))
-                              (.getElementsByClassName "edit")
-                              (aget 0)
-                              (.focus))
             [:author path] (om/set-state! owner :author-path path)
 
             [:drag-start data-kind data source-path offset-pos mouse-pos]
@@ -237,9 +218,7 @@
                                                 :target-path source-path
                                                 :offset-pos offset-pos
                                                 :mouse-pos mouse-pos})
-                (case data-kind
-                  :definition (om/transact! levels #(delete-drag-source % source-path))
-                  :level (om/transact! levels #(splice % source-path))))
+                (delete-at! levels data-kind source-path))
 
             [:drag-move mouse-x mouse-y]
             (om/set-state! owner [:dragging :mouse-pos] [mouse-x mouse-y])
@@ -254,34 +233,45 @@
                 (om/transact! levels #(drop-on % target-path data))
                 :level
                 (om/transact! levels #(insert % target-path data)))
-              
-              (om/set-state! owner :dragging nil)))
-          (recur))
 
-        (go-loop []
-          (let [level (<! delete-level)]
-            (om/transact! levels
-                          (fn [levels] (vec (remove #(= level %) levels))))
-            (recur)))))
+              (om/set-state! owner :dragging nil))
+
+            [:delete-level level-idx]
+            (delete-at! levels :level level-idx)
+
+            [:delete-definition path]
+            (delete-at! levels :definition path))
+          (recur))))
 
     om/IRenderState
     (render-state [this {:keys [id
                                 mode
                                 author-path
                                 dragging
-                                control
-                                fullscreen-graph
-                                delete-level]}]
+                                control]}]
       (dom/div #js {:className "app"}
         (dom/div #js {:className "topBar"}
           (dom/div #js {:className "tabs"}
-            (dom/button #js {:onClick #(om/set-state! owner :mode :author)} "authoring")
-            (dom/button #js {:onClick #(om/set-state! owner :mode :levels)} "levels"))
+            (dom/button #js {:className (if (= mode :author)
+                                          "selectedMode"
+                                          "")
+                             :onClick #(om/set-state! owner :mode :author)}
+                        (dom/i #js {:className "fa fa-pencil-square-o"})
+                        "Authoring")
+            (dom/button #js {:className (if (= mode :levels)
+                                          "selectedMode"
+                                          "")
+                             :onClick #(om/set-state! owner :mode :levels)}
+                        (dom/i #js {:className "fa fa-sitemap"})
+                        "Levels"))
 
           (dom/div #js {:className "controls"}
-            (dom/button #js {:onClick #(docs/save! id @levels)} "save")
+            (dom/button #js {:onClick #(docs/save! id @levels)}
+                        "Save to this URL"
+                        (dom/i #js {:className "fa fa-cloud-upload"}))
             (dom/button #js {:onClick #(js/window.open "https://github.com/osnr/ten-hundred")}
-                        "about")))
+                        "About"
+                        (dom/i #js {:className "fa fa-info"}))))
 
         (let [[author-level-idx author-definition-idx] author-path]
           (dom/div #js {:className "viewport"
@@ -303,7 +293,8 @@
                                                    "none")}}
           (conj (let [level-elements
                       (vec (map-indexed
-                            #(build-level levels delete-level control
+                            #(build-level levels
+                                          control
                                           (when (= (:data-kind dragging) :definition)
                                             (:target-path dragging))
                                           %1 %2)
@@ -315,14 +306,9 @@
                                  :onClick #(add-level! levels)}
                             "+level")))
 
-        (dom/div #js {:className (str "graph"
-                                      (when fullscreen-graph
-                                        " fullscreen"))
-                      :onClick #(handle-fullscreen-graph owner fullscreen-graph)}
-          (om/build graph/graph-view levels
-                    {:init-state {:control control}
-                     :state {:fullscreen-graph fullscreen-graph
-                             :author-path author-path}}))
+        (om/build graph/graph-view levels
+                  {:init-state {:control control}
+                   :state {:author-path author-path}})
 
         (when dragging
           (let [[mouse-x mouse-y] (:mouse-pos dragging)

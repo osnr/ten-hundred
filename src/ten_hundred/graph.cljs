@@ -186,36 +186,58 @@
 
 (defn graph-view [levels owner]
   (reify
+    om/IInitState
+    (init-state [_]
+      {:minimize-graph false
+       :fullscreen-graph false})
+
     om/IRenderState
-    (render-state [this {:keys [fullscreen-graph author-path control]}]
-      (let [terms (terms/find-terms levels)
+    (render-state [this {:keys [minimize-graph fullscreen-graph
+                                author-path control]}]
+        (dom/div #js {:className (str "graph"
+                                      (when fullscreen-graph
+                                        " fullscreen"))
+                      :onClick #(om/update-state! owner :fullscreen-graph not)}
+          (let [terms (terms/find-terms levels)
 
-            g (->> levels
-                   (adjacency-list terms)
-                   (graph))
-            layout (layout g)
-            value (.-_value layout)
+                g (->> levels
+                       (adjacency-list terms)
+                       (graph))
+                layout (layout g)
+                value (.-_value layout)
 
-            width (.-width value)
-            height (.-height value)]
-        (dom/svg (if fullscreen-graph
-                   #js {:width width
-                        :height height}
-                   #js {:width 380
-                        :height 280
-                        :viewBox (str "0 0 "
-                                      width " "
-                                      height)})
-                 (js/React.DOM.defs ; <defs> not supported in Om
-                  #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
-                                                     "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
+                width (.-width value)
+                height (.-height value)]
+            (dom/svg (cond minimize-graph
+                           #js {:style {:display "none"}}
+
+                           fullscreen-graph 
+                           #js {:width width
+                                :height height}
+
+                           :else
+                           #js {:width 380
+                                :height 280
+                                :viewBox (str "0 0 "
+                                              width " "
+                                              height)})
+                     (js/React.DOM.defs ; <defs> not supported in Om
+                      #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
+                                                         "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
                           refx=\"5\" refy=\"2\" orient=\"auto\">
             <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
             </marker>"}})
-                 (apply dom/g #js {:className "nodes"}
-                        (map #(render-node author-path control
-                                           g % (.node layout %))
-                             (.nodes layout)))
-                 (apply dom/g #js {:className "edges"}
-                        (map #(render-edge layout %)
-                             (.edges layout))))))))
+                     (apply dom/g #js {:className "nodes"}
+                            (map #(render-node author-path control
+                                               g % (.node layout %))
+                                 (.nodes layout)))
+                     (apply dom/g #js {:className "edges"}
+                            (map #(render-edge layout %)
+                                 (.edges layout)))))
+          (dom/div #js {:className "graphControls"}
+            (dom/button #js {:onClick (fn [_]
+                                        (om/update-state! owner :minimize-graph not)
+                                        false)}
+                        (case minimize-graph
+                          true (dom/i #js {:className "fa fa-angle-up"})
+                          false (dom/i #js {:className "fa fa-angle-down"}))))))))

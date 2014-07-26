@@ -94,9 +94,16 @@
       (set! (.-onmousemove js/document) #(drag-move! control data-kind %))
       (set! (.-onmouseup js/document) #(drag-end! control))
       (let [viewport (dom/getElementByClass "levels")
+            viewport-bounds (.getBoundingClientRect viewport)
+            viewport-left (.-left viewport-bounds)
+            viewport-top (.-top viewport-bounds)
+
             mouse-x (.-clientX e)
             mouse-y (.-clientY e)]
+        (js/console.log viewport-bounds)
         (put! control [:drag-start data-kind data source-path
-                       [(- (+ (.-scrollLeft viewport) mouse-x) (.-offsetLeft source))
-                        (- (+ (.-scrollTop viewport) mouse-y) (.-offsetTop source))]
+                       [(- (+ (.-scrollLeft viewport) mouse-x)
+                           (+ viewport-left (.-offsetLeft source)))
+                        (- (+ (.-scrollTop viewport) mouse-y)
+                           (+ viewport-top  (.-offsetTop source)))]
                        [mouse-x mouse-y]])))))
