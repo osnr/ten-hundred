@@ -1,5 +1,5 @@
 Ten-hundred is a graphical explanation editor.
 
 ## Building
-Compile with Leiningen and autoprefixer (generate `out/main.css`).
+Compile with Leiningen: `lein cljsbuild (auto | once)` and `lein scss (auto | once)`
 

@@ -8,3 +8,4 @@ pom.xml
 .lein-plugins/
 .nrepl-port
 ten_hundred.js
+.DS_Store

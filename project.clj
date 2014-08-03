@@ -10,7 +10,8 @@
                  [cljs-ajax "0.2.3"]
                  [org.clojure/core.match "0.2.1"]]
 
-  :plugins [[lein-cljsbuild "1.0.2"]]
+  :plugins [[lein-cljsbuild "1.0.2"]
+            [lein-haml-sass "0.2.7-SNAPSHOT"]]
 
   :source-paths ["src"]
 
@@ -21,4 +22,8 @@
                 :output-to "ten_hundred.js"
                 :output-dir "out"
                 :optimizations :none
-                :source-map true}}]})
+                :source-map true}}]}
+
+  :scss {:src "scss/"
+         :output-directory "out/"
+         :output-extension "css"})
