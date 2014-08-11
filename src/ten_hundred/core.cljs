@@ -184,22 +184,57 @@
     :definition
     (let [[source-level-idx source-definition-idx] source-path]
       (om/transact! levels source-level-idx
-                    #(splice % source-definition-idx)))
+                    #(splice % source-definition-idx))
+      (om/update-state! owner :author-path
+                        (fn [[author-level-idx author-definition-idx :as author-path]]
+                          (if (= author-level-idx source-level-idx)
+                            (cond (< author-definition-idx source-definition-idx)
+                                  author-path
+
+                                  (= author-definition-idx source-definition-idx)
+                                  [0 0] ;; TODO maybe make null definition possible?
+
+                                  (> author-definition-idx source-definition-idx)
+                                  [author-level-idx (dec author-definition-idx)])
+
+                            author-path))))
 
     :level
-    (om/transact! levels #(splice % source-path))))
+    (do (om/transact! levels #(splice % source-path))
+        (om/update-state! owner :author-path
+                          (fn [[author-level-idx author-definition-idx :as author-path]]
+                            (cond (< author-level-idx source-path)
+                                  author-path
+
+                                  (= author-level-idx source-path)
+                                  [0 0] ;; TODO
+
+                                  (> author-level-idx source-path)
+                                  [(dec author-level-idx) author-definition-idx]))))))
 
 (defn drop! [levels owner data-kind target-path data]
   (case data-kind
     :definition
-    (om/transact! levels
-                  #(update-in % [(first target-path)]
-                     (fn [level]
-                       (insert level (second target-path) data))))
+    (let [[target-level-idx target-definition-idx] target-path]
+      (om/transact! levels
+                    #(update-in % [target-level-idx]
+                                (fn [level]
+                                  (insert level target-definition-idx data))))
+      (om/update-state! owner :author-path
+                        (fn [[author-level-idx author-definition-idx :as author-path]]
+                          (if (and (= author-level-idx target-level-idx)
+                                   (>= author-definition-idx target-definition-idx))
+                            [author-level-idx (inc author-definition-idx)]
+                            author-path))))
 
     :level
-    (om/transact! levels
-                  #(insert % target-path data))))
+    (do (om/transact! levels
+                      #(insert % target-path data))
+        (om/update-state! owner :author-path
+                          (fn [[author-level-idx author-definition-idx :as author-path]]
+                            (if (>= author-level-idx target-path)
+                              [(inc author-level-idx) author-definition-idx]
+                              author-path))))))
 
 (defn app-view [levels owner]
   (reify
