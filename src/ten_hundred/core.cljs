@@ -179,7 +179,7 @@
 
 (defn log-id [x] (js/console.log (pr-str x)) x)
 
-(defn delete-at! [levels data-kind source-path]
+(defn delete-at! [levels owner data-kind source-path]
   (case data-kind
     :definition
     (let [[source-level-idx source-definition-idx] source-path]
@@ -189,9 +189,17 @@
     :level
     (om/transact! levels #(splice % source-path))))
 
-(defn drop-on [levels [target-level-idx target-definition-idx] definition]
-  (update-in levels [target-level-idx]
-             #(insert % target-definition-idx definition)))
+(defn drop! [levels owner data-kind target-path data]
+  (case data-kind
+    :definition
+    (om/transact! levels
+                  #(update-in % [(first target-path)]
+                     (fn [level]
+                       (insert level (second target-path) data))))
+
+    :level
+    (om/transact! levels
+                  #(insert % target-path data))))
 
 (defn app-view [levels owner]
   (reify
@@ -218,7 +226,8 @@
                                                 :target-path source-path
                                                 :offset-pos offset-pos
                                                 :mouse-pos mouse-pos})
-                (delete-at! levels data-kind source-path))
+                (delete-at! levels owner
+                            data-kind source-path))
 
             [:drag-move mouse-x mouse-y]
             (om/set-state! owner [:dragging :mouse-pos] [mouse-x mouse-y])
@@ -228,19 +237,16 @@
 
             [:drag-end]
             (let [{:keys [data-kind data target-path]} (om/get-state owner :dragging)]
-              (case data-kind
-                :definition
-                (om/transact! levels #(drop-on % target-path data))
-                :level
-                (om/transact! levels #(insert % target-path data)))
-
+              (drop! levels owner data-kind target-path data)
               (om/set-state! owner :dragging nil))
 
             [:delete-level level-idx]
-            (delete-at! levels :level level-idx)
+            (delete-at! levels owner
+                        :level level-idx)
 
             [:delete-definition path]
-            (delete-at! levels :definition path))
+            (delete-at! levels owner
+                        :definition path))
           (recur))))
 
     om/IRenderState

@@ -1,17 +1,17 @@
-$top-bar-bg: #D9CDB8;
+$top-bar-bg: #3F5666;
 
-$tab-border: #D9CDB8;
+$tab-border: #3F5666;
 $tab-hover-bg: #F5F2EB;
 
 $tab-selected-border: #435A66;
-$tab-selected-bg: #88A6AF;
+$tab-selected-bg: #F7D9B3;
 
-$viewport-bg: #424342;
+$viewport-bg: #2F3440;
 
-$level-bg: #D9CDB8;
-$definition-bg: #F5F2EB;
+$level-bg: #F7D9B3;
+$definition-bg: #FFFBF0;
 
-$author-bg: #F5F2EB;
+$author-bg: #FFFBF0;
 
 body {
   margin: 0;
@@ -402,7 +402,7 @@ body {
 }
 
 .authoring > .nodeRect {
-  fill: #88A6AF;
+  fill: #848FB2;
   stroke: #435A66;
 }
 
