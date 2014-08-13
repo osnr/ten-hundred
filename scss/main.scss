@@ -1,18 +1,19 @@
-$top-bar-bg: #3F5666;
+$top-bar-bg: #CBE86B;
 
-$tab-border: #3F5666;
+$tab-border: #CBE86B;
 $tab-hover-bg: #F5F2EB;
 
-$tab-selected-border: #435A66;
-$tab-selected-bg: #F7D9B3;
+$tab-selected-border: #CBE86B;
+$tab-selected-bg: #F2E9E1;
 
-$viewport-bg: #2F3440;
+$viewport-bg: #1C140D;
 
-$level-bg: #F7D9B3;
-$definition-bg: #FFFBF0;
+$level-bg: #CBE86B;
+$definition-bg: #F2E9E1;
+$definition-authoring-bg: #FFFFFF;
 
-$author-bg: #FFFBF0;
-$author-hover-bg: #F7D9B3;
+$author-bg: #F2E9E1;
+$author-hover-bg: #FFFFFF;
 
 $definition-font: Georgia, serif;
 
@@ -136,7 +137,7 @@ body {
   box-shadow: 0px 0px 30px 0px rgba(0, 0, 0, 0.25);
 
   &.authoring {
-    background-color: green;
+    background-color: $definition-authoring-bg;
   }
 }
 
