@@ -20,31 +20,6 @@
   {:term ""
    :meaning ""})
 
-(defn make-example-state []
-  [[(assoc (empty-definition)
-      :term "score"
-      :meaning "five times four")
-    (assoc (empty-definition)
-      :term "continent"
-      :meaning "big piece of land")
-    (assoc (empty-definition)
-      :term "nation"
-      :meaning "a people")
-    (assoc (empty-definition)
-      :term "conceived"
-      :meaning "made up")
-    (assoc (empty-definition)
-      :term "proposition"
-      :meaning "an idea that could be right or wrong")]
-   [(assoc (empty-definition)
-      :term "Gettysburg"
-      :meaning (str "Four score and seven years ago our fathers brought forth "
-                    "on this continent, a new nation, conceived in Liberty, "
-                    "and dedicated to the proposition that all men are created equal."))]
-   [(assoc (empty-definition)
-      :term "cool"
-      :meaning "GettysBurg")]])
-
 (defn drag-clone-style [drag-clone]
   (if drag-clone
     (let [[x y] (:pos drag-clone)
@@ -61,7 +36,7 @@
 
 ; definition view
 (defn handle-term-change! [e definition]
-  (om/update! definition :term (.. e -target -value)))
+  (om/update! definition :term (string/replace (.. e -target -value) #" " "_")))
 
 (defn handle-scroll! [e owner]
   (let [textarea (.-target e)
@@ -72,11 +47,14 @@
 (defn handle-meaning-change! [e owner definition]
   (om/update! definition :meaning (.-value (.-target e))))
 
+(defn handle-focus! [e path control]
+  (put! control [:author path]))
+
 (defn definition-view [definition owner]
   (reify
     om/IRenderState
     (render-state [this {:keys [path
-                                drag-clone
+                                author-path drag-clone
                                 terms
                                 control
                                 scroll-top scroll-width]}]
@@ -84,7 +62,9 @@
                     :style (drag-clone-style drag-clone)
 
                     :onMouseDown #(drag/drag-start! control :definition @definition path %)}
-        (dom/div #js {:className "definition"
+        (dom/div #js {:className (str "definition"
+                                    (when (= author-path path)
+                                      " authoring"))
                       :id (str "definition_" (string/join "_" path))}
           (dom/input #js {:type "text" :placeholder "Term"
                           :className "term"
@@ -98,7 +78,8 @@
                                :value (:meaning definition)
                                :scrollTop scroll-top
                                :onScroll #(handle-scroll! % owner)
-                               :onChange #(handle-meaning-change! % owner definition)})
+                               :onChange #(handle-meaning-change! % owner definition)
+                               :onFocus #(handle-focus! % path control)})
             (apply dom/pre #js {:className "bg"
                                 :ref "bg"
                                 :scrollTop scroll-top
@@ -129,7 +110,7 @@
   (reify
     om/IRenderState
     (render-state [this {:keys [level-idx
-                                drag-clone
+                                drag-clone author-path
                                 drag-target-definition-idx
                                 control terms]}]
       (dom/div #js {:className "level"
@@ -148,6 +129,7 @@
                         (om/build definition-view definition
                                   {:init-state {:control control}
                                    :state {:path [level-idx definition-idx]
+                                           :author-path author-path
                                            :terms terms}}))
                       level))]
             (if drag-target-definition-idx
@@ -167,11 +149,13 @@
   (om/transact! app #(conj % [(empty-definition)])))
 
 (defn build-level [levels control
+                   author-path
                    [drag-target-level-idx drag-target-definition-idx]
                    level-idx level]
   (om/build level-view level
             {:init-state {:control control}
              :state {:level-idx level-idx
+                     :author-path author-path
                      :drag-target-definition-idx
                      (when (= level-idx drag-target-level-idx)
                        drag-target-definition-idx)
@@ -339,13 +323,17 @@
                         :style #js {:display (if (= mode :author)
                                                ""
                                                "none")}}
-            (om/build author/author-view
-                      (-> levels
-                          (get author-level-idx)
-                          (get author-definition-idx))
-                      {:init-state {:control control}
-                       :state {:level-idx author-level-idx
-                               :terms (terms/find-terms (take author-level-idx levels))}})))
+            (if-let [author-definition
+                     (-> levels
+                         (get author-level-idx)
+                         (get author-definition-idx))]
+              (om/build author/author-view author-definition
+                        {:init-state {:control control}
+                         :state {:level-idx author-level-idx
+                                 :terms (terms/find-terms
+                                         (take author-level-idx levels))}})
+              (dom/div #js {:className "authorNil"}
+                       "You haven't selected a definition to view here."))))
 
         (apply dom/div #js {:className "viewport levels"
                             :style #js {:display (if (= mode :levels)
@@ -355,6 +343,7 @@
                       (vec (map-indexed
                             #(build-level levels
                                           control
+                                          author-path
                                           (when (= (:data-kind dragging) :definition)
                                             (:target-path dragging))
                                           %1 %2)
@@ -394,11 +383,11 @@
   (let [id (second (string/split (.-URL js/document) #"#/"))]
     (if (empty? id)
       (init-root (cljs-uuid-utils/uuid-string (cljs-uuid-utils/make-random-uuid))
-                 (make-example-state))
+                 [])
       (docs/load id
                  (fn [loaded-state]
                    (init-root id loaded-state))
                  (fn []
-                   (init-root id (make-example-state)))))))
+                   (init-root id []))))))
 
 (init)
