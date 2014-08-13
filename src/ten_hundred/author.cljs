@@ -51,9 +51,10 @@
   (om/update! definition :meaning (.-value (.-target e))))
 
 (defn handle-mousemove! [e owner definition terms]
-  (let [target (.-target e)]
+  (let [target (.-target e)
+        hover-state (om/get-state owner :hover-state)]
     (cond (classlist/contains target "defined")
-          (when (not (om/get-state owner :hover-state))
+          (when hover-state
             (let [bounds (.getBoundingClientRect target)]
               (om/set-state! owner :hover-state
                              {:terms terms
@@ -67,7 +68,7 @@
                               :alpha false})))
 
           :else
-          (om/set-state! owner :hover-state nil))))
+          (when hover-state (om/set-state! owner :hover-state nil)))))
 
 (defn handle-bg-click! [e owner control]
   (let [target (.-target e)]
@@ -84,6 +85,7 @@
     om/IWillReceiveProps
     (will-receive-props [this next-props]
       (let [prev-props (om/get-props owner)]
+        (println "from" (:term prev-props) "to" (:term next-props))
         (when (not= (:term prev-props) (:term next-props))
           (om/set-state! owner :expand-to nil))))
 

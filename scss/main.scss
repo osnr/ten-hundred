@@ -467,8 +467,7 @@ body {
 }
 
 .nodeRect {
-  fill: white;
-  stroke: #8888a5;
+  fill: $definition-bg;
   pointer-events: auto;
   cursor: help;
   &:hover {
@@ -477,8 +476,7 @@ body {
 }
 
 g.authoring > .nodeRect {
-  fill: #848FB2;
-  stroke: #435A66;
+  fill: white;
 }
 
 .nodeLabel {

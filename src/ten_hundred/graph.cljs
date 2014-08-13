@@ -219,14 +219,14 @@
                            #js {:width 380
                                 :height 280
                                 :viewBox (str "0 0 "
-                                              width " "
-                                              height)})
+                                              (max width 380) " "
+                                              (max height 280))})
                      (js/React.DOM.defs ; <defs> not supported in Om
                       #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
                                                          "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
-                          refx=\"5\" refy=\"2\" orient=\"auto\">
-            <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
-            </marker>"}})
+                                                                  refx=\"5\" refy=\"2\" orient=\"auto\">
+                                                              <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
+                                                          </marker>"}})
                      (apply dom/g #js {:className "nodes"}
                             (map #(render-node author-path control
                                                g % (.node layout %))

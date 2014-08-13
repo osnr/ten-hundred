@@ -20,6 +20,9 @@
   {:term ""
    :meaning ""})
 
+(defn make-initial-state []
+  [[(empty-definition)]])
+
 (defn drag-clone-style [drag-clone]
   (if drag-clone
     (let [[x y] (:pos drag-clone)
@@ -384,11 +387,11 @@
   (let [id (second (string/split (.-URL js/document) #"#/"))]
     (if (empty? id)
       (init-root (cljs-uuid-utils/uuid-string (cljs-uuid-utils/make-random-uuid))
-                 [])
+                 (make-initial-state))
       (docs/load id
                  (fn [loaded-state]
                    (init-root id loaded-state))
                  (fn []
-                   (init-root id []))))))
+                   (init-root id (make-initial-state)))))))
 
 (init)

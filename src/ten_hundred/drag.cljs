@@ -100,7 +100,6 @@
 
             mouse-x (.-clientX e)
             mouse-y (.-clientY e)]
-        (js/console.log viewport-bounds)
         (put! control [:drag-start data-kind data source-path
                        [(- (+ (.-scrollLeft viewport) mouse-x)
                            (+ viewport-left (.-offsetLeft source)))
