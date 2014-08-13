@@ -312,6 +312,12 @@ body {
   }
 }
 
+.hover {
+  background-color: white;
+  border: 1px solid black;
+  width: 400px;
+}
+
 .expandSlider {
   position: absolute;
   bottom: 0;
@@ -342,6 +348,7 @@ body {
 
 .notDefined {
   background-color: rgba(255, 0, 0, 0.5);
+  pointer-events: auto;
 }
 
 /* graph */

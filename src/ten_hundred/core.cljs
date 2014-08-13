@@ -110,7 +110,7 @@
 (defn placeholder-definition-element []
   (dom/div #js {:className "placeholderDefinition"}))
 
-(defn add-definition [level]
+(defn add-definition! [level]
   (om/transact! level #(conj % (empty-definition))))
 
 (defn splice [v idx]
@@ -155,7 +155,7 @@
                       (placeholder-definition-element))
               definition-elements)))
         (dom/button #js {:className "addDefinition"
-                         :onClick #(add-definition level)} "+def")
+                         :onClick #(add-definition! level)} "+def")
         (dom/button #js {:className "deleteLevel"
                          :onClick #(put! control [:delete-level level-idx])} "x")))))
 
@@ -236,6 +236,24 @@
                               [(inc author-level-idx) author-definition-idx]
                               author-path))))))
 
+(defn define! [levels owner term]
+  (let [[author-level-idx _] (om/get-state owner :author-path)
+
+        level-idx
+        (if (= 0 author-level-idx)
+          (do (drop! levels owner :level 0 [])
+              0)
+          (dec author-level-idx))]
+    (om/set-state! owner :author-path
+                   [level-idx
+                    (count (get @levels level-idx))])
+    (om/transact! levels
+                  #(update-in % [level-idx]
+                     (fn [level]
+                       (conj level
+                             (assoc (empty-definition)
+                               :term term)))))))
+
 (defn app-view [levels owner]
   (reify
     om/IInitState
@@ -254,6 +272,8 @@
         (go-loop []
           (match (<! control)
             [:author path] (om/set-state! owner :author-path path)
+
+            [:define term] (define! levels owner term)
 
             [:drag-start data-kind data source-path offset-pos mouse-pos]
             (do (om/set-state! owner :dragging {:data-kind data-kind
@@ -323,8 +343,7 @@
                       (-> levels
                           (get author-level-idx)
                           (get author-definition-idx))
-                      {:init-state {:control control
-                                    :expand-to author-level-idx}
+                      {:init-state {:control control}
                        :state {:level-idx author-level-idx
                                :terms (terms/find-terms (take author-level-idx levels))}})))
 

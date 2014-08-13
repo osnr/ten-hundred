@@ -23,9 +23,12 @@
   (let [lc-word (string/lower-case word)
         term-state (when terms (find-term terms lc-word))]
     (cond term-state
-          (dom/span #js {:className "defined"
-                         :id (str "defined_" (string/join "_" (:path term-state)))}
-                    word)
+          (let [[level-idx definition-idx] (:path term-state)]
+            (dom/span #js {:className "defined"
+
+                           :data-level-idx level-idx
+                           :data-definition-idx definition-idx}
+                      word))
 
           (dict/words lc-word) word
 
