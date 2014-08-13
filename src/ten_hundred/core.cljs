@@ -69,7 +69,8 @@
           (dom/input #js {:type "text" :placeholder "Term"
                           :className "term"
                           :value (:term definition)
-                          :onChange #(handle-term-change! % definition)})
+                          :onChange #(handle-term-change! % definition)
+                          :onFocus #(handle-focus! % path control)})
           (dom/button #js {:className "remove"
                            :onClick #(put! control [:delete-definition path])}
                       (dom/i #js {:className "fa fa-times"}))
