@@ -5,6 +5,20 @@
             [goog.dom :as dom]
             [goog.dom.classlist :as classlist]))
 
+(defn drag-clone-style [drag-clone]
+  (if drag-clone
+    (let [[x y] (:pos drag-clone)
+          transform (str "translate(" x "px," y "px)")]
+      #js {:pointer-events "none"
+           :position "absolute"
+           :left 0
+           :top 0
+           :-webkit-transform transform
+           :-moz-transform transform
+           :-ms-transform transform
+           :transform transform })
+    #js {}))
+
 (defn definition-drag-move! [control e]
   (if-let [target (dom/getAncestorByClass (.-target e) "definition")]
     (let [mouse-y (.-clientY e)
