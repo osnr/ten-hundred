@@ -1,23 +1,23 @@
 (ns ten-hundred.author
   (:require [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]
+            [om-tools.core :refer-macros [defcomponent]]
+            [om-tools.dom :as dom :include-macros true]
+
             [cljs.core.async :refer [put!]]
             [clojure.string :as string]
             [ten-hundred.terms :as terms]
             [ten-hundred.dict :as dict]
             [goog.dom.classlist :as classlist]))
 
-(defn hover-view [definition owner]
-  (reify
-    om/IRenderState
-    (render-state [this {:keys [terms term left bottom]}]
-      (dom/div #js {:className "hover"
-                    :style #js {:position "fixed"
-                                :left left
-                                :bottom bottom}}
-               (:meaning (terms/find-term terms (string/lower-case term)))))))
+(defcomponent hover-view [definition owner]
+  (render-state [this {:keys [terms term left bottom]}]
+    (dom/div {:class "hover"
+              :style {:position "fixed"
+                      :left left
+                      :bottom bottom}}
+      (:meaning (terms/find-term terms (string/lower-case term))))))
 
-; expansion view
+;; expansion view
 (declare expand-word)
 (defn expand [terms expand-to meaning]
   (terms/word-map #(expand-word terms expand-to %) meaning))
@@ -28,15 +28,15 @@
               term-meaning :meaning}
              (terms/find-term terms lc-word)]
       (if (>= term-level-idx expand-to)
-        (apply dom/span #js {:className "expanded-word"}
-               "["
-               (conj (expand terms expand-to term-meaning)
-                     "]"))
-        (dom/span #js {:className "expandable-word"} word))
+        (dom/span {:class "expanded-word"}
+          "["
+          (conj (expand terms expand-to term-meaning)
+                "]"))
+        (dom/span {:class "expandable-word"} word))
 
       (if (dict/words lc-word)
         word
-        (dom/span #js {:className "notDefined"} word)))))
+        (dom/span {:class "notDefined"} word)))))
 
 (defn handle-expand-to-change! [e owner]
   (om/set-state! owner :expand-to (js/parseInt (.. e -target -value))))
@@ -94,49 +94,49 @@
                                 hover-state
                                 scroll-top scroll-width]}]
       (let [expand-to (or expand-to level-idx)]
-        (dom/div #js {:className "author"}
-          (dom/div #js {:className "authorContentWrapper"}
-            (dom/input #js {:className "authorTerm"
-                            :type "text" :placeholder "Term"
-                            :value (:term definition)
-                            :onChange #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
-              (dom/div #js {:className "authorContent"}
-                (apply dom/div #js {:className "authorMeaning"
-                                    :onMouseMove #(handle-mousemove! % owner definition terms)}
-                  (if (= expand-to level-idx)
-                    [(dom/textarea #js {:className "edit"
-                                        :ref "edit"
+        (dom/div {:class "author"}
+          (dom/div {:class "authorContentWrapper"}
+            (dom/input {:class "authorTerm"
+                        :type "text" :placeholder "Term"
+                        :value (:term definition)
+                        :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
+            (dom/div {:class "authorContent"}
+              (dom/div {:class "authorMeaning"
+                        :on-mouse-move #(handle-mousemove! % owner definition terms)}
+                (if (= expand-to level-idx)
+                  [(dom/textarea {:class "edit"
+                                  :ref "edit"
 
-                                        :scrollTop scroll-top
+                                  :scroll-top scroll-top
 
-                                        :value (:meaning definition)
-                                        :onScroll #(handle-scroll! % owner)
-                                        :onChange #(handle-meaning-change! % owner definition)})
-                     (apply dom/pre #js {:className "bg"
-                                         :ref "bg"
+                                  :value (:meaning definition)
+                                  :on-scroll #(handle-scroll! % owner)
+                                  :on-change #(handle-meaning-change! % owner definition)})
+                   (dom/pre {:class "bg"
+                             :ref "bg"
 
-                                         :scrollTop scroll-top
-                                         :style #js {:maxWidth scroll-width}
+                             :scroll-top scroll-top
+                             :style {:max-width scroll-width}
 
-                                         :onClick #(handle-bg-click! % owner control)}
+                             :on-click #(handle-bg-click! % owner control)}
                             (terms/word-map #(terms/colorize-word terms %)
                                             (:meaning definition)))]
-                    [(apply dom/div #js {:className "edit"}
-                            (expand terms expand-to (:meaning definition)))]))
+                  [(dom/div {:class "edit"}
+                     (expand terms expand-to (:meaning definition)))]))
 
-                (when hover-state
-                  (om/build hover-view definition
-                            {:state hover-state}))
+              (when hover-state
+                (om/build hover-view definition
+                          {:state hover-state}))
 
-                (dom/div #js {:className (str "expandControls"
-                                              (when (= level-idx 0)
-                                                " disabled"))}
-                  (dom/i #js {:className "fa fa-plus-square"})
-                  (dom/input #js {:className "expandSlider"
-                                  :type "range"
-                                  :disabled (= level-idx 0)
-                                  :min 0
-                                  :max level-idx
-                                  :value (or expand-to level-idx)
-                                  :onChange #(handle-expand-to-change! % owner)})
-                  (dom/i #js {:className "fa fa-minus-square"})))))))))
+              (dom/div {:class (str "expandControls"
+                                        (when (= level-idx 0)
+                                          " disabled"))}
+                (dom/i {:class "fa fa-plus-square"})
+                (dom/input {:class "expandSlider"
+                            :type "range"
+                            :disabled (= level-idx 0)
+                            :min 0
+                            :max level-idx
+                            :value (or expand-to level-idx)
+                            :on-change #(handle-expand-to-change! % owner)})
+                (dom/i {:class "fa fa-minus-square"})))))))))

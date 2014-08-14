@@ -2,7 +2,9 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [cljs.core.match.macros :refer [match]])
   (:require [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]
+            [om-tools.core :refer-macros [defcomponent]]
+            [om-tools.dom :as dom :include-macros true]
+
             [cljs.core.async :refer [put! chan <!]]
             [cljs.core.match]
             [clojure.string :as string]
@@ -21,7 +23,7 @@
 (defn make-initial-state []
   [[(definition/empty-definition)]])
 
-; whole-app view and graph pane
+;; whole-app view and graph pane
 (defn delete-at! [levels owner data-kind source-path]
   (case data-kind
     :definition
@@ -92,131 +94,127 @@
                     (count (get @levels level-idx))])
     (om/transact! levels
                   #(update-in % [level-idx]
-                     (fn [level]
-                       (conj level
-                             (assoc (definition/empty-definition)
-                               :term term)))))))
+                              (fn [level]
+                                (conj level
+                                      (assoc (definition/empty-definition)
+                                        :term term)))))))
 
-(defn app-view [levels owner]
-  (reify
-    om/IInitState
-    (init-state [_]
-      {:mode :author
+(defcomponent app-view [levels owner]
+  (init-state [_]
+    {:mode :author
 
-       :author-path [0 0]
+     :author-path [0 0]
 
-       :dragging nil
+     :dragging nil
 
-       :control (chan)})
+     :control (chan)})
 
-    om/IWillMount
-    (will-mount [_]
-      (let [control (om/get-state owner :control)]
-        (go-loop []
-          (match (<! control)
-            [:author path] (om/set-state! owner :author-path path)
+  (will-mount [_]
+    (let [control (om/get-state owner :control)]
+      (go-loop []
+        (match (<! control)
+          [:author path] (om/set-state! owner :author-path path)
 
-            [:define term] (define! levels owner term)
+          [:define term] (define! levels owner term)
 
-            [:drag-start data-kind data source-path offset-pos mouse-pos]
-            (do (om/set-state! owner :dragging {:data-kind data-kind
-                                                :data data
-                                                :target-path source-path
-                                                :offset-pos offset-pos
-                                                :mouse-pos mouse-pos})
-                (delete-at! levels owner
-                            data-kind source-path))
+          [:drag-start data-kind data source-path offset-pos mouse-pos]
+          (do (om/set-state! owner :dragging {:data-kind data-kind
+                                              :data data
+                                              :target-path source-path
+                                              :offset-pos offset-pos
+                                              :mouse-pos mouse-pos})
+              (delete-at! levels owner
+                          data-kind source-path))
 
-            [:drag-move mouse-x mouse-y]
-            (om/set-state! owner [:dragging :mouse-pos] [mouse-x mouse-y])
+          [:drag-move mouse-x mouse-y]
+          (om/set-state! owner [:dragging :mouse-pos] [mouse-x mouse-y])
 
-            [:drag-over target-path]
-            (om/set-state! owner [:dragging :target-path] target-path)
+          [:drag-over target-path]
+          (om/set-state! owner [:dragging :target-path] target-path)
 
-            [:drag-end]
-            (let [{:keys [data-kind data target-path]} (om/get-state owner :dragging)]
-              (drop! levels owner data-kind target-path data)
-              (om/set-state! owner :dragging nil))
+          [:drag-end]
+          (let [{:keys [data-kind data target-path]} (om/get-state owner :dragging)]
+            (drop! levels owner data-kind target-path data)
+            (om/set-state! owner :dragging nil))
 
-            [:delete-level level-idx]
-            (delete-at! levels owner
-                        :level level-idx)
+          [:delete-level level-idx]
+          (delete-at! levels owner
+                      :level level-idx)
 
-            [:delete-definition path]
-            (delete-at! levels owner
-                        :definition path))
-          (recur))))
+          [:delete-definition path]
+          (delete-at! levels owner
+                      :definition path))
+        (recur))))
 
-    om/IRenderState
-    (render-state [this {:keys [id
-                                mode
-                                author-path
-                                dragging
-                                control]}]
-      (dom/div #js {:className "app"}
-        (dom/div #js {:className "topBar"}
-          (dom/div #js {:className "tabs"}
-            (dom/button #js {:className (if (= mode :author)
-                                          "selectedMode"
-                                          "")
-                             :onClick #(om/set-state! owner :mode :author)}
-                        (dom/i #js {:className "fa fa-pencil-square-o"})
-                        "Authoring")
-            (dom/button #js {:className (if (= mode :levels)
-                                          "selectedMode"
-                                          "")
-                             :onClick #(om/set-state! owner :mode :levels)}
-                        (dom/i #js {:className "fa fa-sitemap"})
-                        "Levels"))
+  (render-state [this {:keys [id
+                              mode
+                              author-path
+                              dragging
+                              control]}]
+    (dom/div {:class "app"}
+      (dom/div {:class "topBar"}
+        (dom/div {:class "tabs"}
+          (dom/button {:class (if (= mode :author)
+                                    "selectedMode"
+                                    "")
+                       :on-click #(om/set-state! owner :mode :author)}
+                      (dom/i {:class "fa fa-pencil-square-o"})
+                      "Authoring")
+          (dom/button {:class (if (= mode :levels)
+                                    "selectedMode"
+                                    "")
+                       :on-click #(om/set-state! owner :mode :levels)}
+                      (dom/i {:class "fa fa-sitemap"})
+                      "Levels"))
 
-          (dom/div #js {:className "controls"}
-            (dom/button #js {:onClick #(docs/save! id @levels)}
-                        "Save to this URL"
-                        (dom/i #js {:className "fa fa-cloud-upload"}))
-            (dom/button #js {:onClick #(js/window.open "https://github.com/osnr/ten-hundred")}
-                        "About"
-                        (dom/i #js {:className "fa fa-info"}))))
+        (dom/div {:class "controls"}
+          (dom/button {:on-click #(docs/save! id @levels)}
+                      "Save to this URL"
+                      (dom/i {:class "fa fa-cloud-upload"}))
+          (dom/button {:on-click #(js/window.open "https://github.com/osnr/ten-hundred")}
+                      "About"
+                      (dom/i {:class "fa fa-info"}))))
 
-        (let [[author-level-idx author-definition-idx] author-path]
-          (dom/div #js {:className "viewport"
-                        :style #js {:display (if (= mode :author)
-                                               ""
-                                               "none")}}
-            (if-let [author-definition
-                     (-> levels
-                         (get author-level-idx)
-                         (get author-definition-idx))]
-              (om/build author/author-view author-definition
-                        {:init-state {:control control}
-                         :state {:level-idx author-level-idx
-                                 :terms (terms/find-terms
-                                         (take author-level-idx levels))}})
-              (dom/div #js {:className "authorNil"}
-                       "You haven't selected a definition to view here."))))
+      (let [[author-level-idx author-definition-idx] author-path]
+        (dom/div {:class "viewport"
+                  :style {:display (if (= mode :author)
+                                     ""
+                                     "none")}}
+          (if-let [author-definition
+                   (-> levels
+                       (get author-level-idx)
+                       (get author-definition-idx))]
+            (om/build author/author-view author-definition
+                      {:init-state {:control control}
+                       :state {:level-idx author-level-idx
+                               :terms (terms/find-terms
+                                       (take author-level-idx levels))}})
+            (dom/div {:class "authorNil"}
+              "You haven't selected a definition to view here."))))
 
-        (dom/div #js {:className "viewport levels"
-                      :style #js {:display (if (= mode :levels)
-                                             ""
-                                             "none")}}
-          (om/build levels/levels-view levels
-                    {:state {:control control
-                             :dragging dragging
-                             :author-path author-path}}))
+      (dom/div {:class "viewport levels"
+                :style {:display (if (= mode :levels)
+                                   ""
+                                   "none")}}
+        (om/build levels/levels-view levels
+                  {:state {:control control
+                           :dragging dragging
+                           :author-path author-path}}))
 
-        (om/build graph/graph-view levels
-                  {:init-state {:control control}
-                   :state {:author-path author-path}})
+      (om/build graph/graph-view levels
+                {:init-state {:control control}
+                 :state {:author-path author-path}})
 
-        (when dragging
-          (let [[mouse-x mouse-y] (:mouse-pos dragging)
-                [offset-x offset-y] (:offset-pos dragging)]
-            (case (:data-kind dragging)
-              (om/build (case (:data-kind dragging)
-                          :definition definition/definition-view
-                          :level level/level-view)
-                        (:data dragging)
-                        {:state {:drag-clone {:pos [(- mouse-x offset-x)
-                                                    (- mouse-y offset-y)]}}}))))))))
+      (when dragging
+        (let [[mouse-x mouse-y] (:mouse-pos dragging)
+              [offset-x offset-y] (:offset-pos dragging)]
+          (case (:data-kind dragging)
+            (om/build (case (:data-kind dragging)
+                        :definition definition/definition-view
+                        :level level/level-view)
+                      (:data dragging)
+                      {:state {:drag-clone {:pos [(- mouse-x offset-x)
+                                                  (- mouse-y offset-y)]}}})))))))
 
 (defn init-root [id app-state]
   (js/window.history.replaceState "" ""

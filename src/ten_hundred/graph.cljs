@@ -1,6 +1,8 @@
 (ns ten-hundred.graph
   (:require [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]
+            [om-tools.core :refer-macros [defcomponent]]
+            [om-tools.dom :as dom :include-macros true]
+
             [clojure.string :as string]
             [cljs.core.async :refer [put!]]
             [ten-hundred.terms :as terms]))
@@ -63,6 +65,7 @@
 
         dx (- (.-x point) x)
         dy (- (.-y point) y)
+
         w (/ (.-width rect) 2)
         h (/ (.-height rect) 2)]
     (if (> (* (js/Math.abs dy) w)
@@ -163,81 +166,79 @@
 
         path (.-path node)
         label (.-label node)]
-    (dom/g #js {:transform (str "translate(" (- x (/ width 2))
-                                "," (- y (/ height 2)) ")")
-                :className (if (= author-path path)
-                             "authoring node"
-                             "node")
-                :key path}
-           (dom/rect #js {:className "nodeRect"
-                          :onClick #(do (put! control [:author path])
-                                        false)
-                          :width width
-                          :height height})
-           (dom/text #js {:className "nodeLabel"
-                          :textAnchor "middle"
-                          :x (/ width 2)
-                          :y (/ height 2)}
-                     label))))
+    (dom/g {:transform (str "translate(" (- x (/ width 2))
+                            "," (- y (/ height 2)) ")")
+            :class (if (= author-path path)
+                         "authoring node"
+                         "node")
+            :key path}
+      (dom/rect {:class "nodeRect"
+                 :on-click #(do (put! control [:author path])
+                                false)
+                 :width width
+                 :height height})
+      (dom/text {:class "nodeLabel"
+                 :text-anchor "middle"
+                 :x (/ width 2)
+                 :y (/ height 2)}
+                label))))
 
 (defn render-edge [layout e]
-  (dom/path #js {:className "dep"
+  (dom/path {:class "dep"
                  :d (points->svg-path (calc-points layout e))}))
 
-(defn graph-view [levels owner]
-  (reify
-    om/IInitState
-    (init-state [_]
-      {:minimize-graph false
-       :fullscreen-graph false})
+(defcomponent graph-view [levels owner]
+  (init-state [_]
+    {:minimize-graph false
+     :fullscreen-graph false})
 
-    om/IRenderState
-    (render-state [this {:keys [minimize-graph fullscreen-graph
-                                author-path control]}]
-        (dom/div #js {:className (str "graph"
-                                      (when fullscreen-graph
-                                        " fullscreen"))
-                      :onClick #(om/update-state! owner :fullscreen-graph not)}
-          (let [terms (terms/find-terms levels)
+  (render-state [this {:keys [minimize-graph fullscreen-graph
+                              author-path control]}]
+    (dom/div {:class (str "graph"
+                              (when fullscreen-graph
+                                " fullscreen"))
+              :on-click #(om/update-state! owner :fullscreen-graph not)}
+      (let [terms (terms/find-terms levels)
 
-                g (->> levels
-                       (adjacency-list terms)
-                       (graph))
-                layout (layout g)
-                value (.-_value layout)
+            g (->> levels
+                   (adjacency-list terms)
+                   (graph))
+            layout (layout g)
+            value (.-_value layout)
 
-                width (.-width value)
-                height (.-height value)]
-            (dom/svg (cond minimize-graph
-                           #js {:style {:display "none"}}
+            width (.-width value)
+            height (.-height value)]
+        (dom/svg (cond minimize-graph
+                       {:style {:display "none"}}
 
-                           fullscreen-graph 
-                           #js {:width width
-                                :height height}
+                       fullscreen-graph 
+                       {:width width
+                        :height height}
 
-                           :else
-                           #js {:width 380
-                                :height 280
-                                :viewBox (str "0 0 "
-                                              (max width 380) " "
-                                              (max height 280))})
-                     (js/React.DOM.defs ; <defs> not supported in Om
-                      #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
-                                                         "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
-                                                                  refx=\"5\" refy=\"2\" orient=\"auto\">
-                                                              <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
-                                                          </marker>"}})
-                     (apply dom/g #js {:className "nodes"}
-                            (map #(render-node author-path control
-                                               g % (.node layout %))
-                                 (.nodes layout)))
-                     (apply dom/g #js {:className "edges"}
-                            (map #(render-edge layout %)
-                                 (.edges layout)))))
-          (dom/div #js {:className "graphControls"}
-            (dom/button #js {:onClick (fn [_]
-                                        (om/update-state! owner :minimize-graph not)
-                                        false)}
-                        (case minimize-graph
-                          true (dom/i #js {:className "fa fa-angle-up"})
-                          false (dom/i #js {:className "fa fa-angle-down"}))))))))
+                       :else
+                       {:width 380
+                        :height 280
+                        :view-box (str "0 0 "
+                                       (max width 380) " "
+                                       (max height 280))})
+          (js/React.DOM.defs ; <defs> not supported in Om
+           #js {:dangerouslySetInnerHTML #js {:__html ; <marker> not supported in React!
+                                              "<marker id=\"markerArrow\" markerWidth=\"6\" markerHeight=\"4\"
+                                                       refx=\"5\" refy=\"2\" orient=\"auto\">
+                                                   <path d=\"M 0,0 V 4 L6,2 Z\" class=\"arrow\" />
+                                               </marker>"}})
+          (dom/g {:class "nodes"}
+            (map #(render-node author-path control
+                               g % (.node layout %))
+                 (.nodes layout)))
+          (dom/g {:class "edges"}
+            (map #(render-edge layout %)
+                 (.edges layout)))))
+
+      (dom/div {:class "graphControls"}
+        (dom/button {:on-click (fn [_]
+                                 (om/update-state! owner :minimize-graph not)
+                                 false)}
+                    (case minimize-graph
+                      true (dom/i {:class "fa fa-angle-up"})
+                      false (dom/i {:class "fa fa-angle-down"})))))))

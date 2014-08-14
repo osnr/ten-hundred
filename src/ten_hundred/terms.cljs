@@ -1,5 +1,5 @@
 (ns ten-hundred.terms
-  (:require [om.dom :as dom :include-macros true]
+  (:require [om-tools.dom :as dom :include-macros true]
             [cljs.core.async :refer [put!]]
             [clojure.string :as string]
             [ten-hundred.dict :as dict]))
@@ -24,15 +24,15 @@
         term-state (when terms (find-term terms lc-word))]
     (cond term-state
           (let [[level-idx definition-idx] (:path term-state)]
-            (dom/span #js {:className "defined"
+            (dom/span {:class "defined"
 
-                           :data-level-idx level-idx
-                           :data-definition-idx definition-idx}
+                       :data-level-idx level-idx
+                       :data-definition-idx definition-idx}
                       word))
 
           (dict/words lc-word) word
 
-          :else (dom/span #js {:className "notDefined"} word))))
+          :else (dom/span {:class "notDefined"} word))))
 
 (defn word-map [f text]
   (->> text

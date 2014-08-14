@@ -9,15 +9,15 @@
   (if drag-clone
     (let [[x y] (:pos drag-clone)
           transform (str "translate(" x "px," y "px)")]
-      #js {:pointer-events "none"
-           :position "absolute"
-           :left 0
-           :top 0
-           :-webkit-transform transform
-           :-moz-transform transform
-           :-ms-transform transform
-           :transform transform })
-    #js {}))
+      {:pointer-events "none"
+       :position "absolute"
+       :left 0
+       :top 0
+       :-webkit-transform transform
+       :-moz-transform transform
+       :-ms-transform transform
+       :transform transform })
+    {}))
 
 (defn definition-drag-move! [control e]
   (if-let [target (dom/getAncestorByClass (.-target e) "definition")]
