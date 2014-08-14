@@ -54,7 +54,7 @@
   (let [target (.-target e)
         hover-state (om/get-state owner :hover-state)]
     (cond (classlist/contains target "defined")
-          (when hover-state
+          (when (not hover-state)
             (let [bounds (.getBoundingClientRect target)]
               (om/set-state! owner :hover-state
                              {:terms terms
