@@ -85,8 +85,8 @@
     om/IWillReceiveProps
     (will-receive-props [this next-props]
       (let [prev-props (om/get-props owner)]
-        (println "from" (:term prev-props) "to" (:term next-props))
         (when (not= (:term prev-props) (:term next-props))
+          (om/set-state! owner :hover-state nil)
           (om/set-state! owner :expand-to nil))))
 
     om/IRenderState
