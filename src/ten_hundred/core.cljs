@@ -222,7 +222,7 @@
   (js/console.log (pr-str app-state))
   (om/root app-view
            (atom app-state)
-           {:target (. js/document (getElementById "container"))
+           {:target (js/document.getElementById "container")
             :init-state {:id id}}))
 
 (defn init []

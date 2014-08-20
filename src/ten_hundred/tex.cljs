@@ -16,7 +16,7 @@
      (let [old-element-scripts js/MathJax.Hub.elementScripts]
        (set! js/MathJax.Hub.elementScripts
              (fn [element]
-               (let [scripts @pending-scripts]
+               (let [scripts (clj->js @pending-scripts)]
                  (swap! pending-scripts (constantly []))
                  (swap! needs-process (constantly false))
                  scripts)))
@@ -78,7 +78,7 @@
                    (process @script on-render)))))))))
 
   (will-unmount [_]
-    (let [script @(om/get-state owner :script)]
+    (let [script (om/get-state owner :script)]
       (when @script
         (when-let [jax (js/MathJax.Hub.getJaxFor @script)]
           (.Remove jax))))))

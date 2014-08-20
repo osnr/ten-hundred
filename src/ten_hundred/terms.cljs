@@ -34,11 +34,14 @@
 
           :else (dom/span {:class "notDefined"} word))))
 
-(defn word-map [f text]
+(defn colorize-tex [tex]
+  (dom/span {:class "math"} "$$" tex "$$"))
+
+(defn word-map [word-f tex-f text]
   (->> text
        (js/THParser.parse)
        (mapv (fn [[kind text]]
                (case kind
                  "spacing" text
-                 "tex" (str "$$" text "$$")
-                 "word" (f text))))))
+                 "tex" (tex-f text)
+                 "word" (word-f text))))))

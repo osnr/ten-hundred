@@ -18,10 +18,14 @@
                       :bottom bottom}}
       (:meaning (terms/find-term terms (string/lower-case term))))))
 
+(defn render-tex [tex]
+  (om/build tex/tex {:style {}
+                     :text tex}))
+
 ;; expansion view
 (declare expand-word)
 (defn expand [terms expand-to meaning]
-  (terms/word-map #(expand-word terms expand-to %) meaning))
+  (terms/word-map #(expand-word terms expand-to %) render-tex meaning))
 
 (defn expand-word [terms expand-to word]
   (let [lc-word (string/lower-case word)]
@@ -110,49 +114,54 @@
                       :value (:term definition)
                       :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
           (dom/div {:class "authorContent"}
-            (case author-mode
-              :view
-              (dom/div
-                (dom/div {:class "authorMeaning"
-                          :on-click #(om/set-state! owner :author-mode :edit)}
-                  (dom/div {:class "edit"}
-                    (expand terms expand-to (:meaning definition))))
-
-                (dom/div {:class (str "expandControls"
-                                      (when (= level-idx 0)
-                                        " disabled"))}
-                  (dom/i {:class "fa fa-plus-square"})
-                  (dom/input {:class "expandSlider"
-                              :type "range"
-                              :disabled (= level-idx 0)
-                              :min 0
-                              :max level-idx
-                              :value (or expand-to level-idx)
-                              :on-change #(handle-expand-to-change! % owner)})
-                  (dom/i {:class "fa fa-minus-square"})))
-
-              :edit
+            ;; view mode
+            (dom/div {:style {:display (case author-mode
+                                         :view ""
+                                         :edit "none")}}
               (dom/div {:class "authorMeaning"
-                        :on-blur #(om/set-state! owner :author-mode :view)
-                        :on-mouse-move #(handle-mousemove! % owner definition terms)}
-                (dom/textarea {:class "edit"
-                               :ref "edit"
+                        :on-click #(om/set-state! owner :author-mode :edit)}
+                (dom/div {:class "edit"}
+                  (expand terms expand-to (:meaning definition))))
 
-                               :scroll-top scroll-top
+              (dom/div {:class (str "expandControls"
+                                    (when (= level-idx 0)
+                                      " disabled"))}
+                (dom/i {:class "fa fa-plus-square"})
+                (dom/input {:class "expandSlider"
+                            :type "range"
+                            :disabled (= level-idx 0)
+                            :min 0
+                            :max level-idx
+                            :value (or expand-to level-idx)
+                            :on-change #(handle-expand-to-change! % owner)})
+                (dom/i {:class "fa fa-minus-square"})))
 
-                               :placeholder "Define term here."
-                               :value (:meaning definition)
-                               :on-scroll #(handle-scroll! % owner)
-                               :on-change #(handle-meaning-change! % owner definition)})
-                (dom/pre {:class "bg"
-                          :ref "bg"
+            ;; edit mode
+            (dom/div {:class "authorMeaning"
+                      :style {:display (case author-mode
+                                         :view "none"
+                                         :edit "")}
+                      :on-blur #(om/set-state! owner :author-mode :view)
+                      :on-mouse-move #(handle-mousemove! % owner definition terms)}
+              (dom/textarea {:class "edit"
+                             :ref "edit"
 
-                          :scroll-top scroll-top
-                          :style {:max-width scroll-width}
+                             :scroll-top scroll-top
 
-                          :on-click #(handle-bg-click! % owner control)}
-                  (terms/word-map #(terms/colorize-word terms %)
-                                  (:meaning definition)))))
+                             :placeholder "Define term here."
+                             :value (:meaning definition)
+                             :on-scroll #(handle-scroll! % owner)
+                             :on-change #(handle-meaning-change! % owner definition)})
+              (dom/pre {:class "bg"
+                        :ref "bg"
+
+                        :scroll-top scroll-top
+                        :style {:max-width scroll-width}
+
+                        :on-click #(handle-bg-click! % owner control)}
+                (terms/word-map #(terms/colorize-word terms %)
+                                terms/colorize-tex
+                                (:meaning definition))))
 
             (when hover-state
               (om/build hover-view definition

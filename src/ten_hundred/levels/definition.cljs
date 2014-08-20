@@ -63,4 +63,5 @@
                     :scroll-top scroll-top
                     :style {:max-width scroll-width}}
             (terms/word-map #(terms/colorize-word terms %)
+                            terms/colorize-tex
                             (:meaning definition))))))))

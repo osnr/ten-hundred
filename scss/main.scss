@@ -356,6 +356,9 @@ body {
     .edit {
       outline: none;
     }
+    div.edit {
+      cursor: text;
+    }
   }
 }
 
@@ -413,6 +416,10 @@ body {
 .notDefined {
   background-color: rgba(255, 0, 0, 0.5);
   pointer-events: auto;
+}
+
+.math {
+  background-color: rgba(0, 255, 0, 0.1);
 }
 
 .authorMeaning .notDefined {
