@@ -9,11 +9,12 @@
 
 (defn deps [terms level-idx meaning]
   (->> meaning
-       (re-seq #"[^\w']+|[\w']+")
-       (map (fn [token]
-              (let [lc-token (string/lower-case token)]
+       (js/THParser.parse)
+       (filter #(= (first %) "word"))
+       (map (fn [[_ word]]
+              (let [lc-word (string/lower-case word)]
                 (first (filter #(and (< (first (:path %)) level-idx)
-                                     (= (:term %) lc-token))
+                                     (= (:term %) lc-word))
                                terms)))))
        (distinct)
        (remove nil?)))

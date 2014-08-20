@@ -36,7 +36,9 @@
 
 (defn word-map [f text]
   (->> text
-       (re-seq #"[^\w']+|[\w']+")
-       (mapv #(if (re-matches #"[^\w']+" %)
-                %
-                (f %)))))
+       (js/THParser.parse)
+       (mapv (fn [[kind text]]
+               (case kind
+                 "spacing" text
+                 "tex" (str "$$" text "$$")
+                 "word" (f text))))))

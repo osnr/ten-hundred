@@ -81,65 +81,79 @@
                 definition-idx (js/parseInt (.-definitionIdx (.-dataset target)))]
             (put! control [:author [level-idx definition-idx]])))))
 
-(defn author-view [definition owner]
-  (reify
-    om/IWillReceiveProps
-    (will-receive-props [this next-props]
-      (let [prev-props (om/get-props owner)]
-        (when (not= (:term prev-props) (:term next-props))
-          (om/set-state! owner :hover-state nil)
-          (om/set-state! owner :expand-to nil))))
+(defcomponent author-view [definition owner]
+  (init-state [_]
+    {:author-mode :view
+     :hover-state nil})
 
-    om/IRenderState
-    (render-state [this {:keys [control level-idx expand-to close terms
-                                hover-state
-                                scroll-top scroll-width]}]
-      (let [expand-to (or expand-to level-idx)]
-        (dom/div {:class "author"}
-          (dom/div {:class "authorContentWrapper"}
-            (dom/input {:class "authorTerm"
-                        :type "text" :placeholder "Term"
-                        :value (:term definition)
-                        :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
-          (om/build tex/tex {:text (:meaning definition)
-                             :style {}})
-            (dom/div {:class "authorContent"}
+  (will-receive-props [this next-props]
+    (let [prev-props (om/get-props owner)]
+      (when (not= (:term prev-props) (:term next-props))
+        (om/set-state! owner :hover-state nil)
+        (om/set-state! owner :expand-to nil))))
+
+  (did-update [this prev-props prev-state]
+    (let [prev-author-mode (:author-mode prev-state)
+          author-mode (om/get-state owner :author-mode)]
+      (when (and (= prev-author-mode :view) (= author-mode :edit))
+        (.focus (om/get-node owner "edit")))))
+
+  (render-state [this {:keys [control level-idx expand-to close terms
+                              author-mode
+                              hover-state
+                              scroll-top scroll-width]}]
+    (let [expand-to (or expand-to level-idx)]
+      (dom/div {:class "author"}
+        (dom/div {:class "authorContentWrapper"}
+          (dom/input {:class "authorTerm"
+                      :type "text" :placeholder "Term"
+                      :value (:term definition)
+                      :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
+          (dom/div {:class "authorContent"}
+            (case author-mode
+              :view
+              (dom/div
+                (dom/div {:class "authorMeaning"
+                          :on-click #(om/set-state! owner :author-mode :edit)}
+                  (dom/div {:class "edit"}
+                    (expand terms expand-to (:meaning definition))))
+
+                (dom/div {:class (str "expandControls"
+                                      (when (= level-idx 0)
+                                        " disabled"))}
+                  (dom/i {:class "fa fa-plus-square"})
+                  (dom/input {:class "expandSlider"
+                              :type "range"
+                              :disabled (= level-idx 0)
+                              :min 0
+                              :max level-idx
+                              :value (or expand-to level-idx)
+                              :on-change #(handle-expand-to-change! % owner)})
+                  (dom/i {:class "fa fa-minus-square"})))
+
+              :edit
               (dom/div {:class "authorMeaning"
+                        :on-blur #(om/set-state! owner :author-mode :view)
                         :on-mouse-move #(handle-mousemove! % owner definition terms)}
-                (if (= expand-to level-idx)
-                  [(dom/textarea {:class "edit"
-                                  :ref "edit"
+                (dom/textarea {:class "edit"
+                               :ref "edit"
 
-                                  :scroll-top scroll-top
+                               :scroll-top scroll-top
 
-                                  :value (:meaning definition)
-                                  :on-scroll #(handle-scroll! % owner)
-                                  :on-change #(handle-meaning-change! % owner definition)})
-                   (dom/pre {:class "bg"
-                             :ref "bg"
+                               :placeholder "Define term here."
+                               :value (:meaning definition)
+                               :on-scroll #(handle-scroll! % owner)
+                               :on-change #(handle-meaning-change! % owner definition)})
+                (dom/pre {:class "bg"
+                          :ref "bg"
 
-                             :scroll-top scroll-top
-                             :style {:max-width scroll-width}
+                          :scroll-top scroll-top
+                          :style {:max-width scroll-width}
 
-                             :on-click #(handle-bg-click! % owner control)}
-                            (terms/word-map #(terms/colorize-word terms %)
-                                            (:meaning definition)))]
-                  [(dom/div {:class "edit"}
-                     (expand terms expand-to (:meaning definition)))]))
+                          :on-click #(handle-bg-click! % owner control)}
+                  (terms/word-map #(terms/colorize-word terms %)
+                                  (:meaning definition)))))
 
-              (when hover-state
-                (om/build hover-view definition
-                          {:state hover-state}))
-
-              (dom/div {:class (str "expandControls"
-                                        (when (= level-idx 0)
-                                          " disabled"))}
-                (dom/i {:class "fa fa-plus-square"})
-                (dom/input {:class "expandSlider"
-                            :type "range"
-                            :disabled (= level-idx 0)
-                            :min 0
-                            :max level-idx
-                            :value (or expand-to level-idx)
-                            :on-change #(handle-expand-to-change! % owner)})
-                (dom/i {:class "fa fa-minus-square"})))))))))
+            (when hover-state
+              (om/build hover-view definition
+                        {:state hover-state}))))))))
