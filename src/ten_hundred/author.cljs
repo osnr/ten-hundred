@@ -7,6 +7,7 @@
             [clojure.string :as string]
             [ten-hundred.terms :as terms]
             [ten-hundred.dict :as dict]
+            [ten-hundred.tex :as tex]
             [goog.dom.classlist :as classlist]))
 
 (defcomponent hover-view [definition owner]
@@ -100,6 +101,8 @@
                         :type "text" :placeholder "Term"
                         :value (:term definition)
                         :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
+          (om/build tex/tex {:text (:meaning definition)
+                             :style {}})
             (dom/div {:class "authorContent"}
               (dom/div {:class "authorMeaning"
                         :on-mouse-move #(handle-mousemove! % owner definition terms)}
