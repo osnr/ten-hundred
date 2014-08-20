@@ -306,6 +306,24 @@ body {
   height: 40px;
 }
 
+.authorMode {
+  position: absolute;
+  cursor: pointer;
+  position: absolute;
+  right: 60px;
+  top: 53px;
+  color: #aaa;
+
+  z-index: 10;
+
+  &.viewing {
+    color: #aba;
+  }
+  &.editing {
+    color: #aab;
+  }
+}
+
 .authorContent {
   position: absolute;
   top: 90px;
@@ -395,12 +413,12 @@ body {
   }
 }
 
-.expandable-word {
+.expandableWord {
   background-color: rgba(0, 0, 255, 0.05);
   transition: all .25s;
 }
 
-.expanded-word {
+.expandedWord {
   background-color: rgba(0, 0, 255, 0.15);
   transition: all .25s;
 }
@@ -408,9 +426,11 @@ body {
 /* definition overlay */
 
 .defined {
-  background-color: rgba(0, 0, 255, 0.25);
   pointer-events: auto;
   cursor: help;
+}
+.bg .defined {
+  background-color: rgba(0, 0, 255, 0.25);
 }
 
 .notDefined {
@@ -419,7 +439,8 @@ body {
 }
 
 .math {
-  background-color: rgba(0, 255, 0, 0.1);
+  border: 1px solid rgba(0, 255, 0, 0.1);
+  margin: -1px;
 }
 
 .authorMeaning .notDefined {

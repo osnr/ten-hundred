@@ -18,30 +18,50 @@
                       :bottom bottom}}
       (:meaning (terms/find-term terms (string/lower-case term))))))
 
+(defn word-click! [control target]
+  (cond (classlist/contains target "notDefined") ; not defined term
+        (put! control [:define (.-innerText target)])
+
+        (classlist/contains target "defined")
+        (let [level-idx (js/parseInt (.-levelIdx (.-dataset target)))
+              definition-idx (js/parseInt (.-definitionIdx (.-dataset target)))]
+          (put! control [:author [level-idx definition-idx]]))))
+
 (defn render-tex [tex]
   (om/build tex/tex {:style {}
                      :text tex}))
 
 ;; expansion view
 (declare expand-word)
-(defn expand [terms expand-to meaning]
-  (terms/word-map #(expand-word terms expand-to %) render-tex meaning))
+(defn expand [control terms expand-to meaning]
+  (terms/word-map #(expand-word control terms expand-to %) render-tex meaning))
 
-(defn expand-word [terms expand-to word]
+(defn expand-word [control terms expand-to word]
   (let [lc-word (string/lower-case word)]
-    (if-let [{[term-level-idx _] :path
+    (if-let [{[term-level-idx term-definition-idx] :path
               term-meaning :meaning}
              (terms/find-term terms lc-word)]
       (if (>= term-level-idx expand-to)
-        (dom/span {:class "expanded-word"}
+        (dom/span {:class "defined expandedWord"
+                   :data-level-idx term-level-idx
+                   :data-definition-idx term-definition-idx
+                   :on-click #(word-click! control (.-target %))}
           "["
-          (conj (expand terms expand-to term-meaning)
+          lc-word
+          ": "
+          (conj (expand control terms expand-to term-meaning)
                 "]"))
-        (dom/span {:class "expandable-word"} word))
+        (dom/span {:class "defined expandableWord"
+                   :data-level-idx term-level-idx
+                   :data-definition-idx term-definition-idx
+                   :on-click #(word-click! control (.-target %))}
+          word))
 
       (if (dict/words lc-word)
         word
-        (dom/span {:class "notDefined"} word)))))
+        (dom/span {:class "notDefined"
+                   :on-click #(word-click! control (.-target %))}
+          word)))))
 
 (defn handle-expand-to-change! [e owner]
   (om/set-state! owner :expand-to (js/parseInt (.. e -target -value))))
@@ -75,19 +95,15 @@
           :else
           (when hover-state (om/set-state! owner :hover-state nil)))))
 
-(defn handle-bg-click! [e owner control]
-  (let [target (.-target e)]
-    (cond (classlist/contains target "notDefined") ; not defined term
-          (put! control [:define (.-innerText target)])
-
-          (classlist/contains target "defined")
-          (let [level-idx (js/parseInt (.-levelIdx (.-dataset target)))
-                definition-idx (js/parseInt (.-definitionIdx (.-dataset target)))]
-            (put! control [:author [level-idx definition-idx]])))))
+(defn flip-author-mode [author-mode]
+  (case author-mode
+    :view :edit
+    :edit :view))
 
 (defcomponent author-view [definition owner]
   (init-state [_]
-    {:author-mode :view
+    {:author-mode :edit
+     :hover-author-mode false
      :hover-state nil})
 
   (will-receive-props [this next-props]
@@ -103,25 +119,37 @@
         (.focus (om/get-node owner "edit")))))
 
   (render-state [this {:keys [control level-idx expand-to close terms
-                              author-mode
+                              author-mode hover-author-mode
                               hover-state
                               scroll-top scroll-width]}]
-    (let [expand-to (or expand-to level-idx)]
+    (let [expand-to (or expand-to level-idx)
+          author-mode (if hover-author-mode
+                        (flip-author-mode author-mode)
+                        author-mode)]
       (dom/div {:class "author"}
         (dom/div {:class "authorContentWrapper"}
           (dom/input {:class "authorTerm"
                       :type "text" :placeholder "Term"
                       :value (:term definition)
                       :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
+          (dom/i {:class (str "authorMode fa fa-lg "
+                              (case author-mode
+                                :view "viewing fa-lock"
+                                :edit "editing fa-unlock-alt"))
+                  :on-mouse-enter #(om/set-state! owner :hover-author-mode true)
+                  :on-mouse-leave #(om/set-state! owner :hover-author-mode false)
+                  :on-click (fn [_] 
+                              (om/update-state! owner :author-mode flip-author-mode)
+                              (when hover-author-mode
+                                (om/set-state! owner :hover-author-mode false)))})
           (dom/div {:class "authorContent"}
             ;; view mode
             (dom/div {:style {:display (case author-mode
                                          :view ""
                                          :edit "none")}}
-              (dom/div {:class "authorMeaning"
-                        :on-click #(om/set-state! owner :author-mode :edit)}
+              (dom/div {:class "authorMeaning"}
                 (dom/div {:class "edit"}
-                  (expand terms expand-to (:meaning definition))))
+                  (expand control terms expand-to (:meaning definition))))
 
               (dom/div {:class (str "expandControls"
                                     (when (= level-idx 0)
@@ -141,7 +169,6 @@
                       :style {:display (case author-mode
                                          :view "none"
                                          :edit "")}
-                      :on-blur #(om/set-state! owner :author-mode :view)
                       :on-mouse-move #(handle-mousemove! % owner definition terms)}
               (dom/textarea {:class "edit"
                              :ref "edit"
@@ -158,7 +185,7 @@
                         :scroll-top scroll-top
                         :style {:max-width scroll-width}
 
-                        :on-click #(handle-bg-click! % owner control)}
+                        :on-click #(word-click! control (.-target %))}
                 (terms/word-map #(terms/colorize-word terms %)
                                 terms/colorize-tex
                                 (:meaning definition))))
