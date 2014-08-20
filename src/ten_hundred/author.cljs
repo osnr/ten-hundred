@@ -3,12 +3,14 @@
             [om-tools.core :refer-macros [defcomponent]]
             [om-tools.dom :as dom :include-macros true]
 
+            [goog.dom.classlist :as classlist]
+            [goog.dom.selection :as selection]
+
             [cljs.core.async :refer [put!]]
             [clojure.string :as string]
             [ten-hundred.terms :as terms]
             [ten-hundred.dict :as dict]
-            [ten-hundred.tex :as tex]
-            [goog.dom.classlist :as classlist]))
+            [ten-hundred.tex :as tex]))
 
 (defcomponent hover-view [definition owner]
   (render-state [this {:keys [terms term left bottom]}]
@@ -72,8 +74,15 @@
     (om/set-state! owner :scroll-top (.-scrollTop textarea))
     (om/set-state! owner :scroll-width (.-scrollWidth textarea))))
 
+(defn handle-selection-change! [owner]
+  (let [edit (om/get-node owner "edit")]
+    (om/set-state! owner :selection
+                   [(selection/getStart edit)
+                    (selection/getEnd edit)])))
+
 (defn handle-meaning-change! [e owner definition]
-  (om/update! definition :meaning (.-value (.-target e))))
+  (om/update! definition :meaning (.-value (.-target e)))
+  (handle-selection-change! owner))
 
 (defn handle-mousemove! [e owner definition terms]
   (let [target (.-target e)
@@ -95,15 +104,20 @@
           :else
           (when hover-state (om/set-state! owner :hover-state nil)))))
 
-(defn flip-author-mode [author-mode]
-  (case author-mode
-    :view :edit
-    :edit :view))
+(defn flip-author-mode! [owner]
+  (om/update-state! owner :author-mode
+                    (fn [author-mode]
+                      (case author-mode
+                        :view :edit
+                        :edit :view))))
 
 (defcomponent author-view [definition owner]
   (init-state [_]
     {:author-mode :edit
      :hover-author-mode false
+
+     :selection [0 0]
+
      :hover-state nil})
 
   (will-receive-props [this next-props]
@@ -116,16 +130,17 @@
     (let [prev-author-mode (:author-mode prev-state)
           author-mode (om/get-state owner :author-mode)]
       (when (and (= prev-author-mode :view) (= author-mode :edit))
-        (.focus (om/get-node owner "edit")))))
+        (let [edit (om/get-node owner "edit")
+              [start end] (om/get-state owner :selection)]
+          (.focus edit)
+          (selection/setStart edit start)
+          (selection/setEnd edit end)))))
 
   (render-state [this {:keys [control level-idx expand-to close terms
                               author-mode hover-author-mode
                               hover-state
                               scroll-top scroll-width]}]
-    (let [expand-to (or expand-to level-idx)
-          author-mode (if hover-author-mode
-                        (flip-author-mode author-mode)
-                        author-mode)]
+    (let [expand-to (or expand-to level-idx)]
       (dom/div {:class "author"}
         (dom/div {:class "authorContentWrapper"}
           (dom/input {:class "authorTerm"
@@ -136,12 +151,17 @@
                               (case author-mode
                                 :view "viewing fa-lock"
                                 :edit "editing fa-unlock-alt"))
-                  :on-mouse-enter #(om/set-state! owner :hover-author-mode true)
-                  :on-mouse-leave #(om/set-state! owner :hover-author-mode false)
-                  :on-click (fn [_] 
-                              (om/update-state! owner :author-mode flip-author-mode)
-                              (when hover-author-mode
-                                (om/set-state! owner :hover-author-mode false)))})
+                  :on-mouse-enter (fn [_]
+                                    (flip-author-mode! owner)
+                                    (om/set-state! owner :hover-author-mode true))
+                  :on-mouse-leave (fn [_]
+                                    (when hover-author-mode
+                                      (flip-author-mode! owner))
+                                    (om/set-state! owner :hover-author-mode false))
+                  :on-click (fn [_]
+                              (if hover-author-mode
+                                (om/set-state! owner :hover-author-mode false)
+                                (flip-author-mode! owner)))})
           (dom/div {:class "authorContent"}
             ;; view mode
             (dom/div {:style {:display (case author-mode
@@ -177,8 +197,11 @@
 
                              :placeholder "Define term here."
                              :value (:meaning definition)
+
                              :on-scroll #(handle-scroll! % owner)
-                             :on-change #(handle-meaning-change! % owner definition)})
+                             :on-change #(handle-meaning-change! % owner definition)
+                             :on-key-up #(handle-selection-change! owner)
+                             :on-mouse-up #(handle-selection-change! owner)})
               (dom/pre {:class "bg"
                         :ref "bg"
 
