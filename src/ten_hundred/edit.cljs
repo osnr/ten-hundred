@@ -54,24 +54,28 @@
           :else
           (when hover-state (om/set-state! owner :hover-state nil)))))
 
-(defcomponent tex-span-view [tex owner]
+(defcomponent tex-span-view [data owner]
   (did-mount [_]
-    (om/set-state! owner :target (om/get-node owner "tex")))
+    (om/set-state! owner :target (om/get-node owner "math")))
 
   (render-state [_ {:keys [target]}]
-    (dom/span {:class "math"}
-      (dom/span {:class "delimiter"} "$$")
-      (dom/span {:ref "tex"} tex)
-      (dom/span {:class "delimiter"} "$$")
+    (dom/span
+      (dom/span {:class "math"
+                 :ref "math"}
+        (dom/span {:class "delimiter"} "$$")
+        (:tex data)
+        (dom/span {:class "delimiter"} "$$"))
 
       (om/build hover-view
                 {:target target
                  :content (om/build tex/tex
                                     {:style {}
-                                     :text tex})}))))
+                                     :text (:tex data)})}
+                {:react-key (str "hover-" (:idx data))}))))
 
-(defn colorize-tex [tex]
-  (om/build tex-span-view tex))
+(defn colorize-tex [tex idx]
+  (om/build tex-span-view {:tex tex
+                           :idx idx}))
 
 (defcomponent editor-view [definition owner]
   (init-state [this]

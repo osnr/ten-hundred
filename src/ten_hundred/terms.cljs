@@ -42,11 +42,11 @@
 (defn word-map [word-f tex-f text]
   (->> text
        (js/THParser.parse)
-       (mapv (fn [[kind text]]
-               (case kind
-                 "spacing" text
-                 "tex" (tex-f text)
-                 "word" (word-f text))))))
+       (map-indexed (fn [idx [kind text]]
+                      (case kind
+                        "spacing" text
+                        "tex" (tex-f text idx)
+                        "word" (word-f text idx))))))
 
 (defn word-click! [control target]
   (cond (classlist/contains target "notDefined") ; not defined term
