@@ -175,31 +175,28 @@
                       "About"
                       (dom/i {:class "fa fa-info"}))))
 
-      (let [[author-level-idx author-definition-idx] author-path]
-        (dom/div {:class "viewport"
-                  :style {:display (if (= mode :author)
-                                     ""
-                                     "none")}}
-          (if-let [author-definition
-                   (-> levels
-                       (get author-level-idx)
-                       (get author-definition-idx))]
-            (om/build author/author-view author-definition
-                      {:init-state {:control control}
-                       :state {:level-idx author-level-idx
-                               :terms (terms/find-terms
-                                       (take author-level-idx levels))}})
-            (dom/div {:class "authorNil"}
-              "You haven't selected a definition to view here."))))
+      (case mode
+        :author
+        (let [[author-level-idx author-definition-idx] author-path]
+          (dom/div {:class "viewport"}
+            (if-let [author-definition
+                     (-> levels
+                         (get author-level-idx)
+                         (get author-definition-idx))]
+              (om/build author/author-view author-definition
+                        {:init-state {:control control}
+                         :state {:level-idx author-level-idx
+                                 :terms (terms/find-terms
+                                         (take author-level-idx levels))}})
+              (dom/div {:class "authorNil"}
+                "You haven't selected a definition to view here."))))
 
-      (dom/div {:class "viewport levels"
-                :style {:display (if (= mode :levels)
-                                   ""
-                                   "none")}}
-        (om/build levels/levels-view levels
-                  {:state {:control control
-                           :dragging dragging
-                           :author-path author-path}}))
+        :levels
+        (dom/div {:class "viewport levels"}
+          (om/build levels/levels-view levels
+                    {:state {:control control
+                             :dragging dragging
+                             :author-path author-path}})))
 
       (om/build graph/graph-view levels
                 {:init-state {:control control}
