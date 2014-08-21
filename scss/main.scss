@@ -153,9 +153,11 @@ body {
         position: absolute;
         width: 100%;
         height: 100%;
+
         font-family: $definition-font;
         font-size: 13px;
         line-height: 1.3em;
+
         padding: 2px;
         margin: 0;
         border: 0;
@@ -366,8 +368,10 @@ body {
         overflow: hidden;
         padding-bottom: 40px;
         /* because newlines at end of bg don't show up.. */
-        span {
-          white-space: pre-wrap;
+        > {
+          span {
+            white-space: pre-wrap;
+          }
         }
       }
       .edit {
@@ -385,8 +389,9 @@ body {
   font-size: 13px;
 
   background-color: $author-hover-bg;
+  color: black;
+
   padding: 1em;
-  width: 300px;
 
   pointer-events: none;
 

@@ -37,20 +37,18 @@
        (swap! timeout (constantly (js/setTimeout do-process 0 callback))))))
 
 (defn set-script-text! [owner text]
-  (let [script (om/get-state owner :script)]
-    (when-not @script
-      (swap! script (constantly (js/document.createElement "script")))
-      (set! (.-type @script) "math/tex")
-      (.appendChild (om/get-node owner "mathjax") @script))
+  (when-not (.-script owner)
+    (let [script (js/document.createElement "script")]
+      (set! (.-script owner) script)
+      (set! (.-type script) "math/tex")
+      (.appendChild (om/get-node owner "mathjax") script)))
 
-    (if (.hasOwnProperty @script "text")
-      (set! (.-text @script) text)
-      (set! (.-textContent @script) text))))
+  (let [script (.-script owner)]
+    (if (.hasOwnProperty script "text")
+      (set! (.-text script) text)
+      (set! (.-textContent script) text))))
 
 (defcomponent tex [props owner]
-  (init-state [_]
-    {:script (atom nil)})
-
   (render [_]
     (dom/span {:style (:style props)}
       (dom/span {:ref "mathjax"})))
@@ -59,26 +57,26 @@
     (let [text (:text props)
           on-render (:on-render props)]
       (set-script-text! owner text)
-      (process @(om/get-state owner :script) on-render)))
+      (process (.-script owner) on-render)))
 
   (did-update [this prev-props prev-state]
     (let [old-text (:text prev-props)
           new-text (:text props)
           on-render (:on-render props)
 
-          script (om/get-state owner :script)]
+          script (.-script owner)]
       (when-not (= old-text new-text)
-        (if @script
+        (if script
           (js/MathJax.Hub.Queue
            (fn []
-             (if-let [jax (js/MathJax.Hub.getJaxFor @script)]
+             (if-let [jax (js/MathJax.Hub.getJaxFor script)]
                (.Text jax new-text)
 
                (do (set-script-text! owner new-text)
-                   (process @script on-render)))))))))
+                   (process script on-render)))))))))
 
   (will-unmount [_]
-    (let [script (om/get-state owner :script)]
-      (when @script
-        (when-let [jax (js/MathJax.Hub.getJaxFor @script)]
+    (let [script (.-script owner)]
+      (when script
+        (when-let [jax (js/MathJax.Hub.getJaxFor script)]
           (.Remove jax))))))

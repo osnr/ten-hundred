@@ -39,12 +39,6 @@
 
           :else (dom/span {:class "notDefined"} word))))
 
-(defn colorize-tex [tex]
-  (dom/span {:class "math"}
-    (dom/span {:class "delimiter"} "$$")
-    tex
-    (dom/span {:class "delimiter"} "$$")))
-
 (defn word-map [word-f tex-f text]
   (->> text
        (js/THParser.parse)

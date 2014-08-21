@@ -6,24 +6,31 @@
             [cljs.core.async :refer [put!]]
 
             [clojure.string :as string]
+            [goog.dom]
             [goog.dom.selection :as selection]
             [goog.dom.classlist :as classlist]
 
+            [ten-hundred.tex :as tex]
             [ten-hundred.terms :as terms]))
 
-(defcomponent hover-view [definition owner]
-  (render-state [this {:keys [terms term left bottom]}]
-    (dom/div {:class "hover"
-              :style {:position "fixed"
-                      :left left
-                      :bottom bottom}}
-      (:meaning (terms/find-term terms (string/lower-case term))))))
+(defcomponent hover-view [data owner]
+  (render [this]
+    (let [target (:target data)
+          bounds (when target (.getBoundingClientRect target))]
+      (dom/div {:class "hover"
+                :style {:position "fixed"
+                        :left (when bounds (.-left bounds))
+                        :bottom
+                        (when bounds
+                          (- (.-innerHeight js/window)
+                             (.-top bounds)))}}
+        (:content data)))))
 
 (defn handle-scroll! [e owner]
   (let [textarea (.-target e)
         bg (om/get-node owner "bg")]
-    (om/set-state! owner :scroll-top (.-scrollTop textarea))
-    (om/set-state! owner :scroll-width (.-scrollWidth textarea))))
+    (om/set-state! owner :scroll {:top (.-scrollTop textarea)
+                                  :width (.-scrollWidth textarea)})))
 
 (defn handle-selection-change! [owner]
   (let [edit (om/get-node owner "edit")]
@@ -40,20 +47,31 @@
         hover-state (om/get-state owner :hover-state)]
     (cond (classlist/contains target "defined")
           (when (not hover-state)
-            (let [bounds (.getBoundingClientRect target)]
-              (om/set-state! owner :hover-state
-                             {:terms terms
-                              :term (.-innerText target)
-
-                              :left (.-left bounds)
-                              :bottom
-                              (- (.-innerHeight js/window)
-                                 (.-top bounds))
-
-                              :alpha false})))
+            (om/set-state! owner :hover-state
+                           {:target target
+                            :term (.-innerText target)}))
 
           :else
           (when hover-state (om/set-state! owner :hover-state nil)))))
+
+(defcomponent tex-span-view [tex owner]
+  (did-mount [_]
+    (om/set-state! owner :target (om/get-node owner "tex")))
+
+  (render-state [_ {:keys [target]}]
+    (dom/span {:class "math"}
+      (dom/span {:class "delimiter"} "$$")
+      (dom/span {:ref "tex"} tex)
+      (dom/span {:class "delimiter"} "$$")
+
+      (om/build hover-view
+                {:target target
+                 :content (om/build tex/tex
+                                    {:style {}
+                                     :text tex})}))))
+
+(defn colorize-tex [tex]
+  (om/build tex-span-view tex))
 
 (defcomponent editor-view [definition owner]
   (init-state [this]
@@ -62,8 +80,8 @@
      :hidden false
      :hover-state nil ; TODO this should use... mixins or something?
 
-     :scroll-top 0
-     :scroll-width nil})
+     :scroll {:top 0
+              :width nil}})
 
   (did-update [this prev-props prev-state]
     (let [prev-hidden (:hidden prev-state)
@@ -80,13 +98,13 @@
                               path
                               hidden
                               hover-state
-                              scroll-top scroll-width]}]
+                              scroll]}]
     (dom/div {:class "meaning"
               :on-mouse-move #(handle-mousemove! % owner definition terms)}
       (dom/textarea {:class "edit"
                      :ref "edit"
 
-                     :scroll-top scroll-top
+                     :scroll-top (:top scroll)
 
                      :placeholder "Define term here."
                      :value (:meaning definition)
@@ -100,14 +118,15 @@
       (dom/pre {:class "bg"
                 :ref "bg"
 
-                :scroll-top scroll-top
-                :style {:max-width scroll-width}
+                :scroll-top (:top scroll)
+                :style {:max-width (:width scroll)}
 
                 :on-click #(terms/word-click! control (.-target %))}
         (terms/word-map #(terms/colorize-word terms %)
-                        terms/colorize-tex
+                        colorize-tex
                         (:meaning definition)))
 
       (when hover-state
-        (om/build hover-view definition
-                  {:state hover-state})))))
+        (om/build hover-view
+                  {:target (:target hover-state)
+                   :content (:meaning (terms/find-term terms (string/lower-case (:term hover-state))))})))))
