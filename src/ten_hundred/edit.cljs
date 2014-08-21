@@ -13,18 +13,11 @@
             [ten-hundred.tex :as tex]
             [ten-hundred.terms :as terms]))
 
-(defcomponent hover-view [data owner]
+(defcomponent hover-view [content owner]
   (render [this]
-    (let [target (:target data)
-          bounds (when target (.getBoundingClientRect target))]
-      (dom/div {:class "hover"
-                :style {:position "fixed"
-                        :left (when bounds (.-left bounds))
-                        :bottom
-                        (when bounds
-                          (- (.-innerHeight js/window)
-                             (.-top bounds)))}}
-        (:content data)))))
+    (dom/div {:class "hover"
+              :style {:position "absolute"}}
+      content)))
 
 (defn handle-scroll! [e owner]
   (let [textarea (.-target e)
@@ -44,22 +37,22 @@
 
 (defn handle-mousemove! [e owner definition terms]
   (let [target (.-target e)
-        hover-state (om/get-state owner :hover-state)]
+        hover-idx (om/get-state owner :hover-idx)]
     (cond (classlist/contains target "defined")
-          (when (not hover-state)
-            (om/set-state! owner :hover-state
-                           {:target target
-                            :term (.-innerText target)}))
+          (when (not hover-idx)
+            (om/set-state! owner :hover-idx
+                           (js/parseInt (.-idx (.-dataset target)))))
 
           :else
-          (when hover-state (om/set-state! owner :hover-state nil)))))
+          (when hover-idx (om/set-state! owner :hover-idx nil)))))
 
 (defcomponent tex-span-view [data owner]
   (did-mount [_]
     (om/set-state! owner :target (om/get-node owner "math")))
 
   (render-state [_ {:keys [target]}]
-    (dom/span
+    (dom/span {:style {:position "relative"}}
+
       (dom/span {:class "math"
                  :ref "math"}
         (dom/span {:class "delimiter"} "$$")
@@ -67,22 +60,28 @@
         (dom/span {:class "delimiter"} "$$"))
 
       (om/build hover-view
-                {:target target
-                 :content (om/build tex/tex
-                                    {:style {}
-                                     :text (:tex data)})}
+                (om/build tex/tex
+                          {:style {}
+                           :text (:tex data)})
                 {:react-key (str "hover-" (:idx data))}))))
 
 (defn colorize-tex [tex idx]
   (om/build tex-span-view {:tex tex
                            :idx idx}))
 
+(defn colorize-word [terms hover-idx word idx]
+  (dom/span {:style {:position "relative"}}
+    (terms/colorize-word terms word idx)
+    (when (= hover-idx idx)
+      (om/build hover-view
+                (:meaning (terms/find-term terms (string/lower-case word)))))))
+
 (defcomponent editor-view [definition owner]
   (init-state [this]
     {:selection [0 0]
 
      :hidden false
-     :hover-state nil ; TODO this should use... mixins or something?
+     :hover-idx nil ; TODO this should use... mixins or something?
 
      :scroll {:top 0
               :width nil}})
@@ -101,7 +100,7 @@
   (render-state [this {:keys [control terms
                               path
                               hidden
-                              hover-state
+                              hover-idx
                               scroll]}]
     (dom/div {:class "meaning"
               :on-mouse-move #(handle-mousemove! % owner definition terms)}
@@ -126,11 +125,6 @@
                 :style {:max-width (:width scroll)}
 
                 :on-click #(terms/word-click! control (.-target %))}
-        (terms/word-map #(terms/colorize-word terms %)
+        (terms/word-map #(colorize-word terms hover-idx %1 %2)
                         colorize-tex
-                        (:meaning definition)))
-
-      (when hover-state
-        (om/build hover-view
-                  {:target (:target hover-state)
-                   :content (:meaning (terms/find-term terms (string/lower-case (:term hover-state))))})))))
+                        (:meaning definition))))))

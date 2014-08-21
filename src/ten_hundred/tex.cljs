@@ -11,21 +11,22 @@
 (def timeout (atom nil))
 
 (defn do-process [callback]
-  (js/MathJax.Hub.Queue
-   (fn []
-     (let [old-element-scripts js/MathJax.Hub.elementScripts]
-       (set! js/MathJax.Hub.elementScripts
-             (fn [element]
-               (let [scripts (clj->js @pending-scripts)]
-                 (swap! pending-scripts (constantly []))
-                 (swap! needs-process (constantly false))
-                 scripts)))
-       (try
-         (js/MathJax.Hub.Process nil callback)
-         (catch js/Object e
-           (throw e))
-         (finally
-           (set! js/MathJax.Hub.elementScripts old-element-scripts)))))))
+  (when (get js/window "MathJax")
+    (js/MathJax.Hub.Queue
+     (fn []
+       (let [old-element-scripts js/MathJax.Hub.elementScripts]
+         (set! js/MathJax.Hub.elementScripts
+               (fn [element]
+                 (let [scripts (clj->js @pending-scripts)]
+                   (swap! pending-scripts (constantly []))
+                   (swap! needs-process (constantly false))
+                   scripts)))
+         (try
+           (js/MathJax.Hub.Process nil callback)
+           (catch js/Object e
+             (throw e))
+           (finally
+             (set! js/MathJax.Hub.elementScripts old-element-scripts))))))))
 
 (defn process
   ([script]
@@ -77,6 +78,6 @@
 
   (will-unmount [_]
     (let [script (.-script owner)]
-      (when script
+      (when (and script (get js/window "MathJax"))
         (when-let [jax (js/MathJax.Hub.getJaxFor script)]
           (.Remove jax))))))

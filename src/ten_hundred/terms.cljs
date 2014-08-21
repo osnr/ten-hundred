@@ -24,7 +24,7 @@
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
 
-(defn colorize-word [terms word]
+(defn colorize-word [terms word idx]
   (let [lc-word (string/lower-case word)
         term-state (when terms (find-term terms lc-word))]
     (cond term-state
@@ -32,7 +32,9 @@
             (dom/span {:class "defined"
 
                        :data-level-idx level-idx
-                       :data-definition-idx definition-idx}
+                       :data-definition-idx definition-idx
+
+                       :data-idx idx}
                       word))
 
           (dict/words lc-word) word

@@ -104,7 +104,7 @@
             (dom/div {:style {:display (case author-mode
                                          :view ""
                                          :edit "none")}}
-              (dom/div {:class "authorMeaning"}
+              (dom/div {:class "meaning"}
                 (dom/div {:class "edit"}
                   (expand control terms expand-to (:meaning definition))))
 
