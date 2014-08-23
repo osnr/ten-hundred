@@ -1,4 +1,5 @@
 $top-bar-bg: #726B6B;
+$top-bar-height: 30px;
 
 $tab-border: #726B6B;
 $tab-bg: #AEA3A0;
@@ -31,7 +32,7 @@ body {
 }
 
 .topBar {
-  height: 30px;
+  height: $top-bar-height;
   background-color: $top-bar-bg;
 }
 
@@ -540,4 +541,20 @@ g.authoring > .nodeRect {
 
 .arrow {
   fill: white;
+}
+
+/* notifications */
+
+.notifications {
+  position: fixed;
+  top: $top-bar-height + 20px;
+  right: 20px;
+  z-index: 20;
+
+  .notification {
+    background-color: white;
+    padding: 1em;
+    width: 380px;
+    margin-bottom: 20px;
+  }
 }

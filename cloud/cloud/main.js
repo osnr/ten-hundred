@@ -1,8 +1,6 @@
-
-// Use Parse.Cloud.define to define as many cloud functions as you want.
-// For example:
 Parse.Cloud.define("publish", function(request, response) {
     var saveId = request.params.saveId;
+    var levels = request.params.levels;
 
     var query = new Parse.Query("AppState");
     var appState;
@@ -30,12 +28,13 @@ Parse.Cloud.define("publish", function(request, response) {
         }
     }).then(function(publishState) {
         publishState.set("saveId", saveId);
-        publishState.set("levels", appState.get("levels"));
+        publishState.set("levels", levels);
 
-        return publishState.save();
+        return publishState.save(null, { useMasterKey: true });
 
     }).then(function(publishState) {
         appState.set("publishId", publishState.id);
+        appState.set("levels", levels);
 
         return appState.save();
 
@@ -44,5 +43,21 @@ Parse.Cloud.define("publish", function(request, response) {
 
     }, function(error) {
         response.error(error);
+    });
+});
+
+Parse.Cloud.define("getPublish", function(request, response) {
+    var publishId = request.params.publishId;
+
+    var query = new Parse.Query("PublishState");
+    query.get(publishId, {
+        useMasterKey: true,
+
+        success: function(publishState) {
+            response.success({ levels: publishState.get("levels") });
+        },
+        error: function(error) {
+            response.error(error);
+        }
     });
 });

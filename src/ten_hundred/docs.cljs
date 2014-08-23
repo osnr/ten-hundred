@@ -48,30 +48,41 @@
                         "You should report this bug.")))})))
 
 (defn publish! [app-state levels handler error-handler]
-  ;; (if app-state
-  ;;   (if-let [publish-id (.get app-state "publishId")]
-  ;;     ;; mhh this is kind of ugly
-  ;;     ((js/Parse.Query. AppState) .get publish-id)
-  ;;     )
-  ;;   (error-handler "You should save before publishing."))
-  (let [app-state (or app-state
-                      (AppState.))]
-    (.set app-state "levels" (clj->js levels))
-    (.save app-state nil
-           #js {:success
-                (fn [as]
-                  (js/console.log "save success" as)
-                  (handler as))
+  (if app-state
+    (js/Parse.Cloud.run
+     "publish" #js {:saveId (id app-state)
+                    :levels (clj->js levels)}
+     #js {:success
+          (fn [response]
+            (let [publish-id (.-publishId response)
+                  base-location (aget (.match js/window.location.href "(^[^#]*)") 1)]
+              (handler (str base-location "#/view/" publish-id))))
 
-                :error
-                (fn [as error]
-                  (js/console.log "save error" as error)
-                  (error-handler
-                   (str "Save didn't work! Error code " (.-code error)
-                        " trying to save document with id " (id as) ".\n"
-                        (.-message error) "\n\n"
+          :error
+          (fn [error]
+            (error-handler
+             (str "Publish didn't work! Error code " (.-code error) ":\n"
+                  (.-message error))))})
 
-                        "You should report this bug.")))})))
+    (error-handler "You need to save your document before trying to publish it.")))
+
+(defn load-publish [publish-id handler error-handler]
+  (js/Parse.Cloud.run
+   "getPublish" #js {:publishId publish-id}
+   #js {:success
+        (fn [publish-state]
+          (js/console.log "success loading publish " publish-state)
+          (handler (js->clj (.get publish-state "levels")
+                            :keywordize-keys true)))
+
+        :error
+        (fn [object error]
+          (js/console.log "error loading publish " id object error)
+          (error-handler
+           (str "Error code " (.-code error) " trying to load document with publish-id " id ".\n"
+                (.-message error) "\n\n"
+
+                "Starting a new document.")))}))
 
 (defn load [id handler error-handler]
   (let [query (js/Parse.Query. AppState)]
