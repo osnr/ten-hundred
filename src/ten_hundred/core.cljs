@@ -190,7 +190,7 @@
                       "Levels"))
 
         (dom/div {:class "controls"}
-          (if (= file :view)
+          (if (= file :read-only)
             [(dom/button {:on-click #(docs/open-disk!)}
                          "Import file as new"
                          (dom/i {:class "fa fa-folder-open"}))
@@ -265,7 +265,7 @@
   ([]
      (init-root nil (make-initial-state)))
   ([file levels]
-     (when-not (= file :view)
+     (when-not (= file :read-only)
        (js/window.history.replaceState "" ""
                                        (if file
                                          (str "#/" (docs/id file))
@@ -286,7 +286,7 @@
           (let [publish-id (.substring id 5)]
             (docs/load-publish publish-id
                                (fn [loaded-levels]
-                                 (init-root :view loaded-levels))
+                                 (init-root :read-only loaded-levels))
                                (fn [error]
                                  (js/alert error)
                                  (init-root))))

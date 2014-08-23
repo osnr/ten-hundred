@@ -70,9 +70,9 @@
   (js/Parse.Cloud.run
    "getPublish" #js {:publishId publish-id}
    #js {:success
-        (fn [publish-state]
-          (js/console.log "success loading publish " publish-state)
-          (handler (js->clj (.get publish-state "levels")
+        (fn [result]
+          (js/console.log "success loading publish " result)
+          (handler (js->clj (.-levels result)
                             :keywordize-keys true)))
 
         :error
