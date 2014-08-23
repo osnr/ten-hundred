@@ -11,7 +11,7 @@
 (def timeout (atom nil))
 
 (defn do-process [callback]
-  (when (get js/window "MathJax")
+  (when (aget js/window "MathJax")
     (js/MathJax.Hub.Queue
      (fn []
        (let [old-element-scripts js/MathJax.Hub.elementScripts]
@@ -67,7 +67,7 @@
 
           script (.-script owner)]
       (when-not (= old-text new-text)
-        (if script
+        (when (and script (aget js/window "MathJax"))
           (js/MathJax.Hub.Queue
            (fn []
              (if-let [jax (js/MathJax.Hub.getJaxFor script)]
@@ -78,6 +78,6 @@
 
   (will-unmount [_]
     (let [script (.-script owner)]
-      (when (and script (get js/window "MathJax"))
+      (when (and script (aget js/window "MathJax"))
         (when-let [jax (js/MathJax.Hub.getJaxFor script)]
           (.Remove jax))))))

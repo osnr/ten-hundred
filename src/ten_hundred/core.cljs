@@ -15,8 +15,7 @@
             [ten-hundred.docs :as docs]
             [ten-hundred.levels.definition :as definition]
             [ten-hundred.levels.level :as level]
-            [ten-hundred.levels.levels :as levels]
-            [cljs-uuid-utils]))
+            [ten-hundred.levels.levels :as levels]))
 
 (enable-console-print!)
 
@@ -99,6 +98,24 @@
                                       (assoc (definition/empty-definition)
                                         :term term)))))))
 
+(defn save! [owner file levels]
+  (docs/save! file levels
+              (fn [file]
+                (js/window.history.replaceState "" "" (str "#/" (docs/id file)))
+                (om/set-state! owner :file file))
+
+              (fn [error]
+                (js/alert error))))
+
+(defn publish! [owner file levels]
+  (docs/publish! file levels
+              (fn [file]
+                (js/window.history.replaceState "" "" (str "#/" (docs/id file)))
+                (om/set-state! owner :file file))
+
+              (fn [error]
+                (js/alert error))))
+
 (defcomponent app-view [levels owner]
   (init-state [_]
     {:mode :author
@@ -146,7 +163,7 @@
                       :definition path))
         (recur))))
 
-  (render-state [this {:keys [id
+  (render-state [this {:keys [file
                               mode
                               author-path
                               dragging
@@ -168,9 +185,18 @@
                       "Levels"))
 
         (dom/div {:class "controls"}
-          (dom/button {:on-click #(docs/save! id @levels)}
-                      "Save to this URL"
+          (dom/button {:on-click #(docs/open-disk!)}
+                      "Open file"
+                      (dom/i {:class "fa fa-folder-open"}))
+          (dom/button {:on-click #(docs/save-disk! @levels)}
+                      "Save to file"
+                      (dom/i {:class "fa fa-floppy-o"}))
+          (dom/button {:on-click #(save! owner file @levels)}
+                      "Save to URL"
                       (dom/i {:class "fa fa-cloud-upload"}))
+          (dom/button {:on-click #(publish! owner file @levels)}
+                      "Publish"
+                      (dom/i {:class "fa fa-globe"}))
           (dom/button {:on-click #(js/window.open "https://github.com/osnr/ten-hundred")}
                       "About"
                       (dom/i {:class "fa fa-info"}))))
@@ -213,24 +239,26 @@
                       {:state {:drag-clone {:pos [(- mouse-x offset-x)
                                                   (- mouse-y offset-y)]}}})))))))
 
-(defn init-root [id app-state]
-  (js/window.history.replaceState "" ""
-                                  (str "#/" id))
-  (js/console.log (pr-str app-state))
+(defn init-root [file levels]
+  (js/window.history.replaceState "" "" (if file
+                                          (str "#/" (docs/id file))
+                                          "/"))
+  (js/console.log (pr-str levels))
   (om/root app-view
-           (atom app-state)
+           (atom levels)
            {:target (js/document.getElementById "container")
-            :init-state {:id id}}))
+            :init-state {:file file}}))
 
 (defn init []
+  (docs/init!)
   (let [id (second (string/split (.-URL js/document) #"#/"))]
     (if (empty? id)
-      (init-root (cljs-uuid-utils/uuid-string (cljs-uuid-utils/make-random-uuid))
-                 (make-initial-state))
+      (init-root nil (make-initial-state))
       (docs/load id
-                 (fn [loaded-state]
-                   (init-root id loaded-state))
-                 (fn []
-                   (init-root id (make-initial-state)))))))
+                 (fn [file loaded-levels]
+                   (init-root file loaded-levels))
+                 (fn [error]
+                   (js/alert error)
+                   (init-root nil (make-initial-state)))))))
 
 (init)

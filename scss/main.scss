@@ -68,7 +68,8 @@ body {
 }
 
 .controls {
-  float: right;
+  position: absolute;
+  right: 0;
   button {
     height: 22px;
     margin-top: 4px;
@@ -445,6 +446,7 @@ body {
 
 .notDefined {
   background-color: rgba(255, 0, 0, 0.5);
+  cursor: pointer;
   pointer-events: auto;
 }
 
@@ -462,10 +464,6 @@ body {
   background-color: white;
   color: black;
   opacity: 0.5;
-}
-
-.authorContent .notDefined {
-  cursor: pointer;
 }
 
 /* graph */
