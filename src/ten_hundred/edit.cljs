@@ -16,7 +16,7 @@
 (defcomponent hover-view [content owner]
   (render [this]
     (dom/div {:class "hover"
-              :style {:position "absolute"}}
+              :style {:min-width (+ 20 (* 7 (count content)))}}
       content)))
 
 (defn handle-scroll! [e owner]
