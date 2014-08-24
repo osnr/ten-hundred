@@ -194,12 +194,13 @@
      :fullscreen-graph false})
 
   (render-state [this {:keys [minimize-graph fullscreen-graph
-                              author-path control]}]
+                              author-path]}]
     (dom/div {:class (str "graph"
                               (when fullscreen-graph
                                 " fullscreen"))
               :on-click #(om/update-state! owner :fullscreen-graph not)}
       (let [terms (terms/find-terms levels)
+            control (om/get-shared owner :control)
 
             g (->> levels
                    (adjacency-list terms)

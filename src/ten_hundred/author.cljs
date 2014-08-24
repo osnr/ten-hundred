@@ -35,7 +35,7 @@
           "["
           lc-word
           ": "
-          (conj (expand control terms expand-to term-meaning)
+          (conj (vec (expand control terms expand-to term-meaning))
                 "]"))
         (dom/span {:class "defined expandableWord"
                    :data-level-idx term-level-idx
@@ -61,7 +61,9 @@
 
 (defcomponent author-view [definition owner]
   (init-state [_]
-    {:author-mode :edit
+    {:read-only false
+
+     :author-mode :edit
      :hover-author-mode false
 
      :hover-state nil
@@ -74,31 +76,46 @@
         (om/set-state! owner :hover-state nil)
         (om/set-state! owner :expand-to nil))))
 
-  (render-state [this {:keys [control level-idx expand-to close terms
+  (render-state [this {:keys [level-idx expand-to close terms
                               hover-state
                               author-mode hover-author-mode]}]
-    (let [expand-to (or expand-to level-idx)]
+    (let [read-only (om/get-shared owner :read-only)
+          control (om/get-shared owner :control)
+
+          author-mode (if read-only :view author-mode)
+          expand-to (or expand-to level-idx)]
       (dom/div {:class "author"}
         (dom/div {:class "authorContentWrapper"}
           (dom/input {:class "authorTerm"
                       :type "text" :placeholder "Term"
                       :value (:term definition)
                       :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
-          (dom/i {:class (str "authorMode fa fa-lg "
-                              (case author-mode
-                                :view "viewing fa-lock"
-                                :edit "editing fa-unlock-alt"))
-                  :on-mouse-enter (fn [_]
-                                    (flip-author-mode! owner)
-                                    (om/set-state! owner :hover-author-mode true))
-                  :on-mouse-leave (fn [_]
+          (dom/button (merge
+                       {:class (str "authorMode "
                                     (when hover-author-mode
-                                      (flip-author-mode! owner))
-                                    (om/set-state! owner :hover-author-mode false))
-                  :on-click (fn [_]
-                              (if hover-author-mode
-                                (om/set-state! owner :hover-author-mode false)
-                                (flip-author-mode! owner)))})
+                                      "hoverCausedModeChange ")
+                                    (case author-mode
+                                      :view "viewing"
+                                      :edit "editing"))}
+                       (if read-only
+                         {}
+                         {:on-mouse-enter (fn [_]
+                                            (flip-author-mode! owner)
+                                            (om/set-state! owner :hover-author-mode true))
+                          :on-mouse-leave (fn [_]
+                                            (when hover-author-mode
+                                              (flip-author-mode! owner))
+                                            (om/set-state! owner :hover-author-mode false))
+                          :on-click (fn [_]
+                                      (if hover-author-mode
+                                        (om/set-state! owner :hover-author-mode false)
+                                        (flip-author-mode! owner)))}))
+                      (if read-only
+                        "Read-only"
+                        (case author-mode
+                          :view "Viewing"
+                          :edit "Editing")))
+
           (dom/div {:class "authorContent"}
             ;; view mode
             (dom/div {:style {:display (case author-mode
@@ -126,8 +143,7 @@
                                          :view "none"
                                          :edit "")}}
               (om/build edit/editor-view definition
-                        {:state {:control control
-                                 :terms terms
+                        {:state {:terms terms
 
                                  :hidden (= author-mode :view)}}))
 

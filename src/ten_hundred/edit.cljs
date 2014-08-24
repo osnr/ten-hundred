@@ -97,34 +97,36 @@
           (selection/setStart edit start)
           (selection/setEnd edit end)))))
 
-  (render-state [this {:keys [control terms
+  (render-state [this {:keys [terms
                               path
                               hidden
                               hover-idx
                               scroll]}]
-    (dom/div {:class "meaning"
-              :on-mouse-move #(handle-mousemove! % owner definition terms)}
-      (dom/textarea {:class "edit"
-                     :ref "edit"
+    (let [read-only (om/get-shared owner :read-only)
+          control (om/get-shared owner :control)]
+      (dom/div {:class "meaning"
+                :on-mouse-move #(handle-mousemove! % owner definition terms)}
+        (dom/textarea {:class "edit"
+                       :ref "edit"
 
-                     :scroll-top (:top scroll)
+                       :scroll-top (:top scroll)
 
-                     :placeholder "Define term here."
-                     :value (:meaning definition)
+                       :placeholder "Define term here."
+                       :value (:meaning definition)
 
-                     :on-focus (when path #(put! control [:author path]))
+                       :on-focus (when path #(put! control [:author path]))
 
-                     :on-scroll #(handle-scroll! % owner)
-                     :on-change #(handle-meaning-change! % owner definition)
-                     :on-key-up #(handle-selection-change! owner)
-                     :on-mouse-up #(handle-selection-change! owner)})
-      (dom/pre {:class "bg"
-                :ref "bg"
+                       :on-scroll #(handle-scroll! % owner)
+                       :on-change (when-not read-only #(handle-meaning-change! % owner definition))
+                       :on-key-up #(handle-selection-change! owner)
+                       :on-mouse-up #(handle-selection-change! owner)})
+        (dom/pre {:class "bg"
+                  :ref "bg"
 
-                :scroll-top (:top scroll)
-                :style {:max-width (:width scroll)}
+                  :scroll-top (:top scroll)
+                  :style {:max-width (:width scroll)}
 
-                :on-click #(terms/word-click! control (.-target %))}
-        (terms/word-map #(colorize-word terms hover-idx %1 %2)
-                        colorize-tex
-                        (:meaning definition))))))
+                  :on-click #(terms/word-click! control (.-target %))}
+          (terms/word-map #(colorize-word terms hover-idx %1 %2)
+                          colorize-tex
+                          (:meaning definition)))))))

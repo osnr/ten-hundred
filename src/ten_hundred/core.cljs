@@ -23,80 +23,91 @@
   [[(definition/empty-definition)]])
 
 ;; whole-app view and graph pane
+(defn read-only? [owner]
+  (= (om/get-state owner :file) :read-only))
+
 (defn delete-at! [levels owner data-kind source-path]
-  (case data-kind
-    :definition
-    (let [[source-level-idx source-definition-idx] source-path]
-      (om/transact! levels source-level-idx
-                    #(splice % source-definition-idx))
-      (om/update-state! owner :author-path
-                        (fn [[author-level-idx author-definition-idx :as author-path]]
-                          (if (= author-level-idx source-level-idx)
-                            (cond (< author-definition-idx source-definition-idx)
-                                  author-path
+  (when-not (read-only? owner)
+    (case data-kind
+      :definition
+      (let [[source-level-idx source-definition-idx] source-path]
+        (om/transact! levels source-level-idx
+                      #(splice % source-definition-idx))
+        (om/update-state!
+         owner :author-path
+         (fn [[author-level-idx author-definition-idx :as author-path]]
+           (if (= author-level-idx source-level-idx)
+             (cond (< author-definition-idx source-definition-idx)
+                   author-path
 
-                                  (= author-definition-idx source-definition-idx)
-                                  [0 0] ;; TODO maybe make null definition possible?
+                   (= author-definition-idx source-definition-idx)
+                   [0 0] ;; TODO maybe make null definition possible?
 
-                                  (> author-definition-idx source-definition-idx)
-                                  [author-level-idx (dec author-definition-idx)])
+                   (> author-definition-idx source-definition-idx)
+                   [author-level-idx (dec author-definition-idx)])
 
-                            author-path))))
+             author-path))))
 
-    :level
-    (do (om/transact! levels #(splice % source-path))
-        (om/update-state! owner :author-path
-                          (fn [[author-level-idx author-definition-idx :as author-path]]
-                            (cond (< author-level-idx source-path)
-                                  author-path
+      :level
+      (do (om/transact! levels #(splice % source-path))
+          (om/update-state!
+           owner :author-path
+           (fn [[author-level-idx author-definition-idx :as author-path]]
+             (cond (< author-level-idx source-path)
+                   author-path
 
-                                  (= author-level-idx source-path)
-                                  [0 0] ;; TODO
+                   (= author-level-idx source-path)
+                   [0 0] ;; TODO
 
-                                  (> author-level-idx source-path)
-                                  [(dec author-level-idx) author-definition-idx]))))))
+                   (> author-level-idx source-path)
+                   [(dec author-level-idx) author-definition-idx])))))))
 
 (defn drop! [levels owner data-kind target-path data]
-  (case data-kind
-    :definition
-    (let [[target-level-idx target-definition-idx] target-path]
-      (om/transact! levels
-                    #(update-in % [target-level-idx]
-                                (fn [level]
-                                  (insert level target-definition-idx data))))
-      (om/update-state! owner :author-path
-                        (fn [[author-level-idx author-definition-idx :as author-path]]
-                          (if (and (= author-level-idx target-level-idx)
-                                   (>= author-definition-idx target-definition-idx))
-                            [author-level-idx (inc author-definition-idx)]
-                            author-path))))
+  (when-not (read-only? owner)
+    (case data-kind
+      :definition
+      (let [[target-level-idx target-definition-idx] target-path]
+        (om/transact!
+         levels
+         #(update-in % [target-level-idx]
+                     (fn [level]
+                       (insert level target-definition-idx data))))
+        (om/update-state!
+         owner :author-path
+         (fn [[author-level-idx author-definition-idx :as author-path]]
+           (if (and (= author-level-idx target-level-idx)
+                    (>= author-definition-idx target-definition-idx))
+             [author-level-idx (inc author-definition-idx)]
+             author-path))))
 
-    :level
-    (do (om/transact! levels
-                      #(insert % target-path data))
-        (om/update-state! owner :author-path
-                          (fn [[author-level-idx author-definition-idx :as author-path]]
-                            (if (>= author-level-idx target-path)
-                              [(inc author-level-idx) author-definition-idx]
-                              author-path))))))
+      :level
+      (do (om/transact! levels
+                        #(insert % target-path data))
+          (om/update-state!
+           owner :author-path
+           (fn [[author-level-idx author-definition-idx :as author-path]]
+             (if (>= author-level-idx target-path)
+               [(inc author-level-idx) author-definition-idx]
+               author-path)))))))
 
 (defn define! [levels owner term]
-  (let [[author-level-idx _] (om/get-state owner :author-path)
+  (when-not (read-only? owner)
+    (let [[author-level-idx _] (om/get-state owner :author-path)
 
-        level-idx
-        (if (= 0 author-level-idx)
-          (do (drop! levels owner :level 0 [])
-              0)
-          (dec author-level-idx))]
-    (om/set-state! owner :author-path
-                   [level-idx
-                    (count (get @levels level-idx))])
-    (om/transact! levels
-                  #(update-in % [level-idx]
-                              (fn [level]
-                                (conj level
-                                      (assoc (definition/empty-definition)
-                                        :term term)))))))
+          level-idx
+          (if (= 0 author-level-idx)
+            (do (drop! levels owner :level 0 [])
+                0)
+            (dec author-level-idx))]
+      (om/set-state! owner :author-path
+                     [level-idx
+                      (count (get @levels level-idx))])
+      (om/transact! levels
+                    #(update-in % [level-idx]
+                                (fn [level]
+                                  (conj level
+                                        (assoc (definition/empty-definition)
+                                          :term term))))))))
 
 (defn save! [owner file levels]
   (docs/save! file levels
@@ -126,17 +137,19 @@
 
      :notifications []
 
-     :dragging nil
-
-     :control (chan)})
+     :dragging nil})
 
   (will-mount [_]
-    (let [control (om/get-state owner :control)]
-      (go-loop []
+    (go-loop []
+      (let [control (om/get-shared owner :control)
+            read-only (om/get-shared owner :read-only)]
         (match (<! control)
-          [:author path] (om/set-state! owner :author-path path)
+          [:author path]
+          (om/set-state! owner :author-path path)
 
-          [:define term] (define! levels owner term)
+          [:define term]
+          (when-not read-only
+            (define! levels owner term))
 
           [:drag-start data-kind data source-path offset-pos mouse-pos]
           (do (om/set-state! owner :dragging {:data-kind data-kind
@@ -164,108 +177,111 @@
 
           [:delete-definition path]
           (delete-at! levels owner
-                      :definition path))
-        (recur))))
+                      :definition path)))
+      (recur)))
 
   (render-state [this {:keys [file
                               mode
                               author-path
                               notifications
-                              dragging
-                              control]}]
-    (dom/div {:class "app"}
-      (dom/div {:class "topBar"}
-        (dom/div {:class "tabs"}
-          (dom/button {:class (if (= mode :author)
-                                    "selectedMode"
-                                    "")
-                       :on-click #(om/set-state! owner :mode :author)}
-                      (dom/i {:class "fa fa-pencil-square-o"})
-                      "Authoring")
-          (dom/button {:class (if (= mode :levels)
-                                    "selectedMode"
-                                    "")
-                       :on-click #(om/set-state! owner :mode :levels)}
-                      (dom/i {:class "fa fa-sitemap"})
-                      "Levels"))
+                              dragging]}]
+    (let [read-only (om/get-shared owner :read-only)]
+      (dom/div {:class "app"}
+        (dom/div {:class "topBar"}
+          (dom/div {:class "tabs"}
+            (dom/button {:class (if (= mode :author)
+                                  "selectedMode"
+                                  "")
+                         :on-click #(om/set-state! owner :mode :author)}
+                        (dom/i {:class "fa fa-pencil-square-o"})
+                        "Authoring")
+            (dom/button {:class (if (= mode :levels)
+                                  "selectedMode"
+                                  "")
+                         :on-click #(om/set-state! owner :mode :levels)}
+                        (dom/i {:class "fa fa-sitemap"})
+                        "Levels"))
 
-        (dom/div {:class "controls"}
-          (if (= file :read-only)
-            [(dom/button {:on-click #(docs/open-disk!)}
-                         "Import file as new"
-                         (dom/i {:class "fa fa-folder-open"}))
-             (dom/button {:on-click #(docs/save-disk! @levels)}
-                         "Export file"
-                         (dom/i {:class "fa fa-floppy-o"}))
-             (dom/button {:on-click #(save! owner file @levels)}
-                         "Save as new URL"
-                         (dom/i {:class "fa fa-cloud-upload"}))]
+          (dom/div {:class "controls"}
+            (if read-only
+              [(dom/button {:on-click #(docs/open-disk!)}
+                           "Import file as new"
+                           (dom/i {:class "fa fa-folder-open"}))
+               (dom/button {:on-click #(docs/save-disk! @levels)}
+                           "Export file"
+                           (dom/i {:class "fa fa-floppy-o"}))
+               (dom/button {:on-click #(save! owner file @levels)}
+                           "Save as new URL"
+                           (dom/i {:class "fa fa-cloud-upload"}))]
 
-            [(dom/button {:on-click #(docs/open-disk!)}
-                         "Import file"
-                         (dom/i {:class "fa fa-folder-open"}))
-             (dom/button {:on-click #(docs/save-disk! @levels)}
-                         "Export file"
-                         (dom/i {:class "fa fa-floppy-o"}))
-             (dom/button {:on-click #(save! owner file @levels)}
-                         "Save to URL"
-                         (dom/i {:class "fa fa-cloud-upload"}))
-             (dom/button {:on-click #(publish! owner file @levels)}
-                         "Publish"
-                         (dom/i {:class "fa fa-globe"}))])
+              [(dom/button {:on-click #(docs/open-disk!)}
+                           "Import file"
+                           (dom/i {:class "fa fa-folder-open"}))
+               (dom/button {:on-click #(docs/save-disk! @levels)}
+                           "Export file"
+                           (dom/i {:class "fa fa-floppy-o"}))
+               (dom/button {:on-click #(save! owner file @levels)}
+                           "Save to URL"
+                           (dom/i {:class "fa fa-cloud-upload"}))
+               (dom/button {:on-click #(publish! owner file @levels)}
+                           "Publish"
+                           (dom/i {:class "fa fa-globe"}))])
 
-          (dom/button {:on-click #(js/window.open "https://github.com/osnr/ten-hundred")}
-                      "About"
-                      (dom/i {:class "fa fa-info"}))))
+            (dom/button {:on-click #(js/window.open "https://github.com/osnr/ten-hundred")}
+                        "About"
+                        (dom/i {:class "fa fa-info"}))))
 
-      (case mode
-        :author
-        (let [[author-level-idx author-definition-idx] author-path]
-          (dom/div {:class "viewport"}
-            (if-let [author-definition
-                     (-> levels
-                         (get author-level-idx)
-                         (get author-definition-idx))]
-              (om/build author/author-view author-definition
-                        {:init-state {:control control}
-                         :state {:level-idx author-level-idx
-                                 :terms (terms/find-terms
-                                         (take author-level-idx levels))}})
-              (dom/div {:class "authorNil"}
-                "You haven't selected a definition to view here."))))
+        (case mode
+          :author
+          (let [[author-level-idx author-definition-idx] author-path]
+            (dom/div {:class "viewport"}
+              (if-let [author-definition
+                       (-> levels
+                           (get author-level-idx)
+                           (get author-definition-idx))]
+                (om/build author/author-view author-definition
+                          {:state (merge
+                                   {:level-idx author-level-idx
+                                    :terms (terms/find-terms
+                                            (take author-level-idx levels))}
+                                   (if (= file :read-only)
+                                     {:read-only true
+                                      :author-mode :view}
+                                     {}))})
+                (dom/div {:class "authorNil"}
+                  "You haven't selected a definition to view here."))))
 
-        :levels
-        (dom/div {:class "viewport levels"}
-          (om/build levels/levels-view levels
-                    {:state {:control control
-                             :dragging dragging
-                             :author-path author-path}})))
+          :levels
+          (dom/div {:class "viewport levels"}
+            (om/build levels/levels-view levels
+                      {:state {:read-only (= file :read-only)
+                               :dragging dragging
+                               :author-path author-path}})))
 
-      (dom/div {:class "notifications"}
-        (map (fn [notification]
-               (dom/div {:class "notification"} notification))
-             notifications))
+        (dom/div {:class "notifications"}
+          (map (fn [notification]
+                 (dom/div {:class "notification"} notification))
+               notifications))
 
-      (om/build graph/graph-view levels
-                {:init-state {:control control}
-                 :state {:author-path author-path}})
+        (om/build graph/graph-view levels
+                  {:state {:author-path author-path}})
 
-      (when dragging
-        (let [[mouse-x mouse-y] (:mouse-pos dragging)
-              [offset-x offset-y] (:offset-pos dragging)]
-          (case (:data-kind dragging)
-            (om/build (case (:data-kind dragging)
-                        :definition definition/definition-view
-                        :level level/level-view)
-                      (:data dragging)
-                      {:state {:drag-clone {:pos [(- mouse-x offset-x)
-                                                  (- mouse-y offset-y)]}}})))))))
+        (when dragging
+          (let [[mouse-x mouse-y] (:mouse-pos dragging)
+                [offset-x offset-y] (:offset-pos dragging)]
+            (case (:data-kind dragging)
+              (om/build (case (:data-kind dragging)
+                          :definition definition/definition-view
+                          :level level/level-view)
+                        (:data dragging)
+                        {:state {:drag-clone {:pos [(- mouse-x offset-x)
+                                                    (- mouse-y offset-y)]}}}))))))))
 
 (defn init-root
   ([]
-     (init-root nil (make-initial-state)))
-  ([file levels]
-     (when-not (= file :read-only)
+     (init-root nil (make-initial-state) false))
+  ([file levels read-only]
+     (when-not read-only
        (js/window.history.replaceState "" ""
                                        (if file
                                          (str "#/" (docs/id file))
@@ -274,7 +290,10 @@
      (om/root app-view
               (atom levels)
               {:target (js/document.getElementById "container")
-               :init-state {:file file}})))
+               :init-state {:file file}
+
+               :shared {:control (chan)
+                        :read-only read-only}})))
 
 (defn init []
   (docs/init!)
@@ -286,7 +305,7 @@
           (let [publish-id (.substring id 5)]
             (docs/load-publish publish-id
                                (fn [loaded-levels]
-                                 (init-root :read-only loaded-levels))
+                                 (init-root nil loaded-levels true))
                                (fn [error]
                                  (js/alert error)
                                  (init-root))))
@@ -294,7 +313,7 @@
           :else
           (docs/load id
                      (fn [file loaded-levels]
-                       (init-root file loaded-levels))
+                       (init-root file loaded-levels false))
                      (fn [error]
                        (js/alert error)
                        (init-root))))))
