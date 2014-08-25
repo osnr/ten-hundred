@@ -16,7 +16,8 @@
 (defcomponent hover-view [content owner]
   (render [this]
     (dom/div {:class "hover"
-              :style {:min-width (+ 20 (* 7 (count content)))}}
+              :style (when (string? content)
+                       {:min-width (+ 20 (* 7 (count content)))})}
       content)))
 
 (defn handle-scroll! [e owner]
@@ -59,11 +60,12 @@
         (:tex data)
         (dom/span {:class "delimiter"} "$$"))
 
-      (om/build hover-view
-                (om/build tex/tex
-                          {:style {}
-                           :text (:tex data)})
-                {:react-key (str "hover-" (:idx data))}))))
+      ;; (om/build hover-view
+      ;;           (om/build tex/tex
+      ;;                     {:style {}
+      ;;                      :text (:tex data)})
+      ;;           {:react-key (str "hover-" (:idx data))})
+      )))
 
 (defn colorize-tex [tex idx]
   (om/build tex-span-view {:tex tex

@@ -10,6 +10,7 @@
             [clojure.string :as string]
             [ten-hundred.util :refer [splice insert]]
             [ten-hundred.graph :as graph]
+            [ten-hundred.notifications :as notifications]
             [ten-hundred.terms :as terms]
             [ten-hundred.author :as author]
             [ten-hundred.docs :as docs]
@@ -118,31 +119,32 @@
               (fn [error]
                 (js/alert error))))
 
-(defn notify! [owner notification]
-  (om/update-state! owner :notifications #(conj % notification)))
+(defn notify! [notifications notification]
+  (om/transact! notifications #(conj % notification)))
 
-(defn publish! [owner file levels]
+(defn publish! [notifications file levels]
   (docs/publish! file levels
                  (fn [publish-url]
-                   (notify! owner (str "Published to " publish-url)))
+                   (notify! notifications
+                            [:published publish-url]))
 
                  (fn [error]
                    (js/alert error))))
 
-(defcomponent app-view [levels owner]
+(defcomponent app-view [app owner]
   (init-state [_]
     {:mode :author
 
      :author-path [0 0]
 
-     :notifications []
-
      :dragging nil})
 
   (will-mount [_]
-    (go-loop []
-      (let [control (om/get-shared owner :control)
-            read-only (om/get-shared owner :read-only)]
+    (let [control (om/get-shared owner :control)
+          read-only (om/get-shared owner :read-only)
+
+          levels (:levels app)]
+      (go-loop []
         (match (<! control)
           [:author path]
           (om/set-state! owner :author-path path)
@@ -177,15 +179,18 @@
 
           [:delete-definition path]
           (delete-at! levels owner
-                      :definition path)))
-      (recur)))
+                      :definition path))
+        (recur))))
 
   (render-state [this {:keys [file
                               mode
                               author-path
                               notifications
                               dragging]}]
-    (let [read-only (om/get-shared owner :read-only)]
+    (let [read-only (om/get-shared owner :read-only)
+
+          levels (:levels app)
+          notifications (:notifications app)]
       (dom/div {:class "app"}
         (dom/div {:class "topBar"}
           (dom/div {:class "tabs"}
@@ -223,7 +228,7 @@
                (dom/button {:on-click #(save! owner file @levels)}
                            "Save to URL"
                            (dom/i {:class "fa fa-cloud-upload"}))
-               (dom/button {:on-click #(publish! owner file @levels)}
+               (dom/button {:on-click #(publish! notifications file @levels)}
                            "Publish"
                            (dom/i {:class "fa fa-globe"}))])
 
@@ -258,13 +263,10 @@
                                :dragging dragging
                                :author-path author-path}})))
 
-        (dom/div {:class "notifications"}
-          (map (fn [notification]
-                 (dom/div {:class "notification"} notification))
-               notifications))
-
         (om/build graph/graph-view levels
                   {:state {:author-path author-path}})
+
+        (om/build notifications/notifications-view notifications)
 
         (when dragging
           (let [[mouse-x mouse-y] (:mouse-pos dragging)
@@ -285,10 +287,11 @@
        (js/window.history.replaceState "" ""
                                        (if file
                                          (str "#/" (docs/id file))
-                                         "/")))
+                                         "")))
      (js/console.log (pr-str levels))
      (om/root app-view
-              (atom levels)
+              (atom {:levels levels
+                     :notifications []})
               {:target (js/document.getElementById "container")
                :init-state {:file file}
 

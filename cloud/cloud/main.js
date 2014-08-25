@@ -2,6 +2,8 @@ Parse.Cloud.define("publish", function(request, response) {
     var saveId = request.params.saveId;
     var levels = request.params.levels;
 
+    Parse.Cloud.useMasterKey();
+
     var query = new Parse.Query("AppState");
     var appState;
     query.get(saveId).then(function(as) {
@@ -30,7 +32,7 @@ Parse.Cloud.define("publish", function(request, response) {
         publishState.set("saveId", saveId);
         publishState.set("levels", levels);
 
-        return publishState.save(null, { useMasterKey: true });
+        return publishState.save();
 
     }).then(function(publishState) {
         appState.set("publishId", publishState.id);
