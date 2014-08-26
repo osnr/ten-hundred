@@ -49,7 +49,8 @@
               definition-elements)))
 
         (when-not read-only
-          (dom/button {:class "addDefinition"
-                       :on-click #(add-definition! level)} "+def")
-          (dom/button {:class "deleteLevel"
-                       :on-click #(put! control [:delete-level level-idx])} "x"))))))
+          (dom/div
+            (dom/button {:class "addDefinition"
+                         :on-click #(add-definition! level)} "+def")
+            (dom/button {:class "deleteLevel"
+                         :on-click #(put! control [:delete-level level-idx])} "x")))))))

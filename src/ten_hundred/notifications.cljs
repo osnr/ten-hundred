@@ -8,11 +8,11 @@
             [ten-hundred.util :refer [splice]]))
 
 (defn render-notification [notification]
-  (match notification
-    [:published publish-url]
+  (case (first notification)
+    :published
     (dom/span
       "Published to "
-      (dom/a {:href publish-url} publish-url))))
+      (dom/a {:href (second notification)} (second notification)))))
 
 (defcomponent notifications-view [notifications owner]
   (render [_]

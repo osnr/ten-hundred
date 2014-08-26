@@ -52,19 +52,9 @@
 (defn handle-expand-to-change! [e owner]
   (om/set-state! owner :expand-to (js/parseInt (.. e -target -value))))
 
-(defn flip-author-mode! [owner]
-  (om/update-state! owner :author-mode
-                    (fn [author-mode]
-                      (case author-mode
-                        :view :edit
-                        :edit :view))))
-
 (defcomponent author-view [definition owner]
   (init-state [_]
     {:read-only false
-
-     :author-mode :edit
-     :hover-author-mode false
 
      :hover-state nil
 
@@ -77,52 +67,37 @@
         (om/set-state! owner :expand-to nil))))
 
   (render-state [this {:keys [level-idx expand-to close terms
-                              hover-state
-                              author-mode hover-author-mode]}]
+                              hover-state]}]
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)
 
-          author-mode (if read-only :view author-mode)
           expand-to (or expand-to level-idx)]
-      (dom/div {:class "author"}
+      (dom/div {:class (str "author"
+                            (when read-only " readOnly"))}
         (dom/div {:class "authorContentWrapper"}
-          (dom/input {:class "authorTerm"
-                      :type "text" :placeholder "Term"
-                      :value (:term definition)
-                      :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
-          (dom/button (merge
-                       {:class (str "authorMode "
-                                    (when hover-author-mode
-                                      "hoverCausedModeChange ")
-                                    (case author-mode
-                                      :view "viewing"
-                                      :edit "editing"))}
-                       (if read-only
-                         {}
-                         {:on-mouse-enter (fn [_]
-                                            (flip-author-mode! owner)
-                                            (om/set-state! owner :hover-author-mode true))
-                          :on-mouse-leave (fn [_]
-                                            (when hover-author-mode
-                                              (flip-author-mode! owner))
-                                            (om/set-state! owner :hover-author-mode false))
-                          :on-click (fn [_]
-                                      (if hover-author-mode
-                                        (om/set-state! owner :hover-author-mode false)
-                                        (flip-author-mode! owner)))}))
-                      (if read-only
-                        "Read-only"
-                        (case author-mode
-                          :view "Viewing"
-                          :edit "Editing")))
-
           (dom/div {:class "authorContent"}
-            ;; view mode
-            (dom/div {:style {:display (case author-mode
-                                         :view ""
-                                         :edit "none")}}
+            ;; edit pane
+            (dom/div {:class "pane editPane"
+                      :style {:display (if read-only
+                                         "none"
+                                         "")}}
+              (dom/input {:class "authorTerm"
+                          :type "text" :placeholder "Term"
+                          :value (:term definition)
+                          :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
+
+              (om/build edit/editor-view definition
+                        {:state {:terms terms}
+                         :react-key "edit-pane-view"}))
+
+            ;; view pane
+            (dom/div {:class "pane viewPane"}
+              (dom/div {:class "authorTerm"}
+                (:term definition))
+
               (dom/div {:class "meaning"}
-                (dom/div {:class "edit"}
+                (dom/div {:class "edit"
+                          :key "view-pane-content"}
                   (expand control terms expand-to (:meaning definition))))
 
               (dom/div {:class (str "expandControls"
@@ -137,15 +112,6 @@
                             :value (or expand-to level-idx)
                             :on-change #(handle-expand-to-change! % owner)})
                 (dom/i {:class "fa fa-minus-square"})))
-
-            ;; edit mode
-            (dom/div {:style {:display (case author-mode
-                                         :view "none"
-                                         :edit "")}}
-              (om/build edit/editor-view definition
-                        {:state {:terms terms
-
-                                 :hidden (= author-mode :view)}}))
 
             (when hover-state
               (om/build edit/hover-view definition

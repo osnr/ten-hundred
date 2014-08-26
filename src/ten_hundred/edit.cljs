@@ -7,7 +7,6 @@
 
             [clojure.string :as string]
             [goog.dom]
-            [goog.dom.selection :as selection]
             [goog.dom.classlist :as classlist]
 
             [ten-hundred.tex :as tex]
@@ -23,18 +22,13 @@
 (defn handle-scroll! [e owner]
   (let [textarea (.-target e)
         bg (om/get-node owner "bg")]
+  (js/console.log "scroll" (.-scrollTop textarea))
+
     (om/set-state! owner :scroll {:top (.-scrollTop textarea)
                                   :width (.-scrollWidth textarea)})))
 
-(defn handle-selection-change! [owner]
-  (let [edit (om/get-node owner "edit")]
-    (om/set-state! owner :selection
-                   [(selection/getStart edit)
-                    (selection/getEnd edit)])))
-
 (defn handle-meaning-change! [e owner definition]
-  (om/update! definition :meaning (.-value (.-target e)))
-  (handle-selection-change! owner))
+  (om/update! definition :meaning (.-value (.-target e))))
 
 (defn handle-mousemove! [e owner definition terms]
   (let [target (.-target e)
@@ -80,28 +74,13 @@
 
 (defcomponent editor-view [definition owner]
   (init-state [this]
-    {:selection [0 0]
-
-     :hidden false
-     :hover-idx nil ; TODO this should use... mixins or something?
+    {:hover-idx nil ; TODO this should use... mixins or something?
 
      :scroll {:top 0
               :width nil}})
 
-  (did-update [this prev-props prev-state]
-    (let [prev-hidden (:hidden prev-state)
-          hidden (om/get-state owner :hidden)]
-      (when (and prev-hidden
-                 (not hidden))
-        (let [edit (om/get-node owner "edit")
-              [start end] (om/get-state owner :selection)]
-          (.focus edit)
-          (selection/setStart edit start)
-          (selection/setEnd edit end)))))
-
   (render-state [this {:keys [terms
                               path
-                              hidden
                               hover-idx
                               scroll]}]
     (let [read-only (om/get-shared owner :read-only)
@@ -119,9 +98,7 @@
                        :on-focus (when path #(put! control [:author path]))
 
                        :on-scroll #(handle-scroll! % owner)
-                       :on-change (when-not read-only #(handle-meaning-change! % owner definition))
-                       :on-key-up #(handle-selection-change! owner)
-                       :on-mouse-up #(handle-selection-change! owner)})
+                       :on-change (when-not read-only #(handle-meaning-change! % owner definition))})
         (dom/pre {:class "bg"
                   :ref "bg"
 

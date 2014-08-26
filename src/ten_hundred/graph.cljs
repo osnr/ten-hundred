@@ -195,21 +195,21 @@
 
   (render-state [this {:keys [minimize-graph fullscreen-graph
                               author-path]}]
-    (dom/div {:class (str "graph"
-                              (when fullscreen-graph
-                                " fullscreen"))
-              :on-click #(om/update-state! owner :fullscreen-graph not)}
-      (let [terms (terms/find-terms levels)
-            control (om/get-shared owner :control)
+    (let [terms (terms/find-terms levels)
+          control (om/get-shared owner :control)
 
-            g (->> levels
-                   (adjacency-list terms)
-                   (graph))
-            layout (layout g)
-            value (.-_value layout)
+          g (->> levels
+                 (adjacency-list terms)
+                 (graph))
+          layout (layout g)
+          value (.-_value layout)
 
-            width (.-width value)
-            height (.-height value)]
+          width (.-width value)
+          height (.-height value)]
+      (dom/div {:class (str "graph"
+                            (when fullscreen-graph
+                              " fullscreen"))
+                :on-click #(om/update-state! owner :fullscreen-graph not)}
         (dom/svg (cond minimize-graph
                        {:style {:display "none"}}
 
@@ -235,12 +235,19 @@
                  (.nodes layout)))
           (dom/g {:class "edges"}
             (map #(render-edge layout %)
-                 (.edges layout)))))
+                 (.edges layout))))
 
-      (dom/div {:class "graphControls"}
-        (dom/button {:on-click (fn [_]
-                                 (om/update-state! owner :minimize-graph not)
-                                 false)}
-                    (case minimize-graph
-                      true (dom/i {:class "fa fa-angle-up"})
-                      false (dom/i {:class "fa fa-angle-down"})))))))
+        (when-not minimize-graph
+          (dom/button {:class "graphAddDefinition"
+                       :on-click (fn [_]
+                                   (put! control [:define ""])
+                                   false)}
+                      "+def"))
+
+        (dom/div {:class "graphControls"}
+          (dom/button {:on-click (fn [_]
+                                   (om/update-state! owner :minimize-graph not)
+                                   false)}
+                      (case minimize-graph
+                        true (dom/i {:class "fa fa-angle-up"})
+                        false (dom/i {:class "fa fa-angle-down"}))))))))

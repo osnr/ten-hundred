@@ -8,21 +8,33 @@
   )
 
 (defn definition->text [{:keys [term meaning]}]
-  (str "## " term "\n"
+  (str ":: " term "\n"
        meaning))
 
 (defn level->text [idx level]
-  (str "# Level " idx "\n"
+  (str ": Level " idx "\n"
        (string/join "\n\n" (map definition->text level))))
 
 (defn levels->text [levels]
   (string/join "\n\n" (map-indexed level->text levels)))
 
-(defn text->levels []
-  )
+(defn text->levels [text]
+  (re-seq #": " text))
+
+(defn text->level)
+
+(defn text->definition)
 
 (defn save-disk! [levels]
-  (js/console.log (levels->text levels)))
+  (let [levels-text (levels->text levels)
+        blob (js/Blob. #js [levels-text]
+                       #js {:type "text/plain;charset=utf-8"})
+
+        top-definition (first (last (remove empty? levels)))
+        title (if (string/blank? (:term top-definition))
+                "Untitled"
+                (:term top-definition))]
+    (js/saveAs blob (str title ".10h"))))
 
 (defn id [app-state]
   (.-id app-state))
@@ -104,6 +116,7 @@
                        "Starting a new document.")))})))
 
 (defn init! []
-  (js/Parse.initialize "WlNgee8GBcq0tDvv2x6jQdWlWtPMNbZcNdvI3amd"
-                       "y2zxRukimVk6uXOiqzWrGui2A1ca9ugAgLvO1Wxr")
-  (set! AppState (js/Parse.Object.extend "AppState")))
+  (when (aget js/window "Parse")
+    (js/Parse.initialize "WlNgee8GBcq0tDvv2x6jQdWlWtPMNbZcNdvI3amd"
+                         "y2zxRukimVk6uXOiqzWrGui2A1ca9ugAgLvO1Wxr")
+    (set! AppState (js/Parse.Object.extend "AppState"))))

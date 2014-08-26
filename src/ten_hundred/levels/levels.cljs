@@ -29,7 +29,8 @@
 
 (defcomponent levels-view [levels owner]
   (render-state [this {:keys [dragging author-path]}]
-    (let [control (om/get-shared owner :control)]
+    (let [read-only (om/get-shared owner :read-only)
+          control (om/get-shared owner :control)]
       (dom/div nil
         (conj (let [level-elements
                     (vec (map-indexed
