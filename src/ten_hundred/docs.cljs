@@ -19,11 +19,11 @@
   (string/join "\n\n" (map-indexed level->text levels)))
 
 (defn text->levels [text]
-  (re-seq #": " text))
+  )
 
-(defn text->level)
+(defn text->level [text])
 
-(defn text->definition)
+(defn text->definition [text])
 
 (defn save-disk! [levels]
   (let [levels-text (levels->text levels)

@@ -14,13 +14,15 @@
 (defn add-level! [app]
   (om/transact! app #(conj % [(definition/empty-definition)])))
 
-(defn build-level [levels control read-only
+(defn build-level [levels control highlight
                    author-path
                    [drag-target-level-idx drag-target-definition-idx]
                    level-idx level]
   (om/build level/level-view level
             {:init-state {:control control}
-             :state {:level-idx level-idx
+             :state {:highlight highlight
+
+                     :level-idx level-idx
                      :author-path author-path
                      :drag-target-definition-idx
                      (when (= level-idx drag-target-level-idx)
@@ -28,7 +30,7 @@
                      :terms (terms/find-terms (take level-idx levels))}}))
 
 (defcomponent levels-view [levels owner]
-  (render-state [this {:keys [dragging author-path]}]
+  (render-state [this {:keys [highlight dragging author-path]}]
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)]
       (dom/div nil
@@ -36,7 +38,7 @@
                     (vec (map-indexed
                           #(build-level levels
                                         control
-                                        read-only
+                                        highlight
                                         author-path
                                         (when (= (:data-kind dragging) :definition)
                                           (:target-path dragging))

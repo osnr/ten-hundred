@@ -12,11 +12,20 @@
             [ten-hundred.tex :as tex]
             [ten-hundred.terms :as terms]))
 
+(defn render-tex [tex]
+  (om/build tex/tex {:style {}
+                     :text tex}))
+
 (defcomponent hover-view [content owner]
   (render [this]
     (dom/div {:class "hover"
               :style (when (string? content)
-                       {:min-width (+ 20 (* 7 (count content)))})}
+                       {:width (min 400 (+ 20 (* 7 (count content))))})}
+      (terms/word-map identity render-tex content))))
+
+(defcomponent tex-hover-view [content owner]
+  (render [this]
+    (dom/div {:class "hover"}
       content)))
 
 (defn handle-scroll! [e owner]
@@ -80,6 +89,7 @@
               :width nil}})
 
   (render-state [this {:keys [terms
+                              highlight
                               path
                               hover-idx
                               scroll]}]
@@ -99,13 +109,14 @@
 
                        :on-scroll #(handle-scroll! % owner)
                        :on-change (when-not read-only #(handle-meaning-change! % owner definition))})
-        (dom/pre {:class "bg"
-                  :ref "bg"
+        (when highlight
+          (dom/pre {:class "bg"
+                    :ref "bg"
 
-                  :scroll-top (:top scroll)
-                  :style {:max-width (:width scroll)}
+                    :scroll-top (:top scroll)
+                    :style {:max-width (:width scroll)}
 
-                  :on-click #(terms/word-click! control (.-target %))}
-          (terms/word-map #(colorize-word terms hover-idx %1 %2)
-                          colorize-tex
-                          (:meaning definition)))))))
+                    :on-click #(terms/word-click! control (.-target %))}
+            (terms/word-map #(colorize-word terms hover-idx %1 %2)
+                            colorize-tex
+                            (:meaning definition))))))))

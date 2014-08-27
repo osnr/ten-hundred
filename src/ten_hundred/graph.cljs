@@ -196,6 +196,7 @@
   (render-state [this {:keys [minimize-graph fullscreen-graph
                               author-path]}]
     (let [terms (terms/find-terms levels)
+          read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)
 
           g (->> levels
@@ -237,7 +238,7 @@
             (map #(render-edge layout %)
                  (.edges layout))))
 
-        (when-not minimize-graph
+        (when-not (or read-only minimize-graph)
           (dom/button {:class "graphAddDefinition"
                        :on-click (fn [_]
                                    (put! control [:define ""])

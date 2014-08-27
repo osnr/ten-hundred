@@ -17,6 +17,7 @@
 (def css-trans-group (-> js/React (aget "addons") (aget "CSSTransitionGroup")))
 (defcomponent level-view [level owner]
   (render-state [this {:keys [terms
+                              highlight
                               level-idx
                               drag-clone author-path
                               drag-target-definition-idx]}]
@@ -38,7 +39,8 @@
                 (vec (map-indexed
                       (fn [definition-idx definition]
                         (om/build definition/definition-view definition
-                                  {:state {:read-only read-only
+                                  {:state {:highlight highlight
+
                                            :path [level-idx definition-idx]
                                            :author-path author-path
                                            :terms terms}}))

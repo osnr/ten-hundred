@@ -13,16 +13,16 @@
             [ten-hundred.tex :as tex]
             [ten-hundred.edit :as edit]))
 
-(defn render-tex [tex]
-  (om/build tex/tex {:style {}
-                     :text tex}))
-
 ;; expansion view
 (declare expand-word)
-(defn expand [control terms expand-to meaning]
-  (terms/word-map #(expand-word control terms expand-to %) render-tex meaning))
+(defn expand [control highlight terms expand-to meaning]
+  (terms/word-map (if highlight
+                    #(expand-word control highlight terms expand-to %)
+                    identity)
+                  edit/render-tex
+                  meaning))
 
-(defn expand-word [control terms expand-to word]
+(defn expand-word [control highlight terms expand-to word]
   (let [lc-word (string/lower-case word)]
     (if-let [{[term-level-idx term-definition-idx] :path
               term-meaning :meaning}
@@ -35,7 +35,7 @@
           "["
           lc-word
           ": "
-          (conj (vec (expand control terms expand-to term-meaning))
+          (conj (vec (expand control highlight terms expand-to term-meaning))
                 "]"))
         (dom/span {:class "defined expandableWord"
                    :data-level-idx term-level-idx
@@ -66,7 +66,8 @@
         (om/set-state! owner :hover-state nil)
         (om/set-state! owner :expand-to nil))))
 
-  (render-state [this {:keys [level-idx expand-to close terms
+  (render-state [this {:keys [terms
+                              highlight level-idx expand-to
                               hover-state]}]
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)
@@ -87,7 +88,8 @@
                           :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
 
               (om/build edit/editor-view definition
-                        {:state {:terms terms}
+                        {:state {:terms terms
+                                 :highlight highlight}
                          :react-key "edit-pane-view"}))
 
             ;; view pane
@@ -98,7 +100,7 @@
               (dom/div {:class "meaning"}
                 (dom/div {:class "edit"
                           :key "view-pane-content"}
-                  (expand control terms expand-to (:meaning definition))))
+                  (expand control highlight terms expand-to (:meaning definition))))
 
               (dom/div {:class (str "expandControls"
                                     (when (= level-idx 0)

@@ -24,91 +24,85 @@
   [[(definition/empty-definition)]])
 
 ;; whole-app view and graph pane
-(defn read-only? [owner]
-  (= (om/get-state owner :file) :read-only))
-
 (defn delete-at! [levels owner data-kind source-path]
-  (when-not (read-only? owner)
-    (case data-kind
-      :definition
-      (let [[source-level-idx source-definition-idx] source-path]
-        (om/transact! levels source-level-idx
-                      #(splice % source-definition-idx))
+  (case data-kind
+    :definition
+    (let [[source-level-idx source-definition-idx] source-path]
+      (om/transact! levels source-level-idx
+                    #(splice % source-definition-idx))
+      (om/update-state!
+       owner :author-path
+       (fn [[author-level-idx author-definition-idx :as author-path]]
+         (if (= author-level-idx source-level-idx)
+           (cond (< author-definition-idx source-definition-idx)
+                 author-path
+
+                 (= author-definition-idx source-definition-idx)
+                 [0 0] ;; TODO maybe make null definition possible?
+
+                 (> author-definition-idx source-definition-idx)
+                 [author-level-idx (dec author-definition-idx)])
+
+           author-path))))
+
+    :level
+    (do (om/transact! levels #(splice % source-path))
         (om/update-state!
          owner :author-path
          (fn [[author-level-idx author-definition-idx :as author-path]]
-           (if (= author-level-idx source-level-idx)
-             (cond (< author-definition-idx source-definition-idx)
-                   author-path
+           (cond (< author-level-idx source-path)
+                 author-path
 
-                   (= author-definition-idx source-definition-idx)
-                   [0 0] ;; TODO maybe make null definition possible?
+                 (= author-level-idx source-path)
+                 [0 0] ;; TODO
 
-                   (> author-definition-idx source-definition-idx)
-                   [author-level-idx (dec author-definition-idx)])
-
-             author-path))))
-
-      :level
-      (do (om/transact! levels #(splice % source-path))
-          (om/update-state!
-           owner :author-path
-           (fn [[author-level-idx author-definition-idx :as author-path]]
-             (cond (< author-level-idx source-path)
-                   author-path
-
-                   (= author-level-idx source-path)
-                   [0 0] ;; TODO
-
-                   (> author-level-idx source-path)
-                   [(dec author-level-idx) author-definition-idx])))))))
+                 (> author-level-idx source-path)
+                 [(dec author-level-idx) author-definition-idx]))))))
 
 (defn drop! [levels owner data-kind target-path data]
-  (when-not (read-only? owner)
-    (case data-kind
-      :definition
-      (let [[target-level-idx target-definition-idx] target-path]
-        (om/transact!
-         levels
-         #(update-in % [target-level-idx]
-                     (fn [level]
-                       (insert level target-definition-idx data))))
+  (case data-kind
+    :definition
+    (let [[target-level-idx target-definition-idx] target-path]
+      (om/transact!
+       levels
+       #(update-in % [target-level-idx]
+                   (fn [level]
+                     (insert level target-definition-idx data))))
+      (om/update-state!
+       owner :author-path
+       (fn [[author-level-idx author-definition-idx :as author-path]]
+         (if (and (= author-level-idx target-level-idx)
+                  (>= author-definition-idx target-definition-idx))
+           [author-level-idx (inc author-definition-idx)]
+           author-path))))
+
+    :level
+    (do (om/transact! levels
+                      #(insert % target-path data))
         (om/update-state!
          owner :author-path
          (fn [[author-level-idx author-definition-idx :as author-path]]
-           (if (and (= author-level-idx target-level-idx)
-                    (>= author-definition-idx target-definition-idx))
-             [author-level-idx (inc author-definition-idx)]
-             author-path))))
-
-      :level
-      (do (om/transact! levels
-                        #(insert % target-path data))
-          (om/update-state!
-           owner :author-path
-           (fn [[author-level-idx author-definition-idx :as author-path]]
-             (if (>= author-level-idx target-path)
-               [(inc author-level-idx) author-definition-idx]
-               author-path)))))))
+           (if (>= author-level-idx target-path)
+             [(inc author-level-idx) author-definition-idx]
+             author-path))))))
 
 (defn define! [levels owner term]
-  (when-not (read-only? owner)
-    (let [[author-level-idx _] (om/get-state owner :author-path)
+  (let [[author-level-idx _] (om/get-state owner :author-path)
 
-          level-idx
-          (if (= 0 author-level-idx)
-            (do (drop! levels owner :level 0 [])
-                0)
-            (dec author-level-idx))]
-      (om/set-state! owner :author-path
-                     [level-idx
-                      (count (get @levels level-idx))])
-      (om/transact! levels
-                    #(update-in % [level-idx]
-                                (fn [level]
-                                  (conj level
-                                        (assoc (definition/empty-definition)
-                                          :term term))))))))
+        level-idx
+        (if (= 0 author-level-idx)
+          (do (drop! levels owner :level 0 [])
+              0)
+          (dec author-level-idx))]
+    (om/set-state! owner :author-path
+                   [level-idx
+                    (count (get @levels level-idx))])
+    (om/transact! levels
+                  #(update-in % [level-idx]
+                              (fn [level]
+                                (conj level
+                                      (assoc (definition/empty-definition)
+                                        :term term)))))))
 
 (defn save! [owner file levels]
   (docs/save! file levels
@@ -134,6 +128,8 @@
 (defcomponent app-view [app owner]
   (init-state [_]
     {:mode :author
+
+     :highlight true
 
      :author-path [0 0]
 
@@ -184,6 +180,7 @@
 
   (render-state [this {:keys [file
                               mode
+                              highlight
                               author-path
                               notifications
                               dragging]}]
@@ -208,6 +205,12 @@
                         "Levels"))
 
           (dom/div {:class "controls"}
+            (dom/label
+             (dom/input {:type "checkbox"
+                         :checked highlight
+                         :on-change #(om/set-state! owner :highlight (.-checked (.-target %)))})
+             "Highlight terms")
+
             (if read-only
               [(dom/button {:on-click #(docs/open-disk!)}
                            "Import file as new"
@@ -245,21 +248,17 @@
                            (get author-level-idx)
                            (get author-definition-idx))]
                 (om/build author/author-view author-definition
-                          {:state (merge
-                                   {:level-idx author-level-idx
-                                    :terms (terms/find-terms
-                                            (take author-level-idx levels))}
-                                   (if (= file :read-only)
-                                     {:read-only true
-                                      :author-mode :view}
-                                     {}))})
+                          {:state {:level-idx author-level-idx
+                                   :highlight highlight
+                                   :terms (terms/find-terms
+                                           (take author-level-idx levels))}})
                 (dom/div {:class "authorNil"}
                   "You haven't selected a definition to view here."))))
 
           :levels
           (dom/div {:class "viewport levels"}
             (om/build levels/levels-view levels
-                      {:state {:read-only (= file :read-only)
+                      {:state {:highlight highlight
                                :dragging dragging
                                :author-path author-path}})))
 

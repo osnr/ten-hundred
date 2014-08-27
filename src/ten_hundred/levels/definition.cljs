@@ -22,6 +22,7 @@
 
 (defcomponent definition-view [definition owner]
   (render-state [this {:keys [terms
+                              highlight
                               path
                               author-path drag-clone
                               scroll-top scroll-width]}]
@@ -30,8 +31,9 @@
       (dom/div {:class "definitionWrapper"
                 :style (drag/drag-clone-style drag-clone)
 
-                :on-mouse-down (when-not read-only
-                                 #(drag/drag-start! control :definition @definition path %))}
+                :on-mouse-down
+                (when-not read-only
+                  #(drag/drag-start! control :definition @definition path %))}
 
         (dom/div {:class (str "definition"
                               (when (= author-path path)
@@ -52,5 +54,6 @@
           (dom/div {:class "meaning"}
             (om/build edit/editor-view definition
                       {:state {:terms terms
+                               :highlight highlight
 
                                :path path}})))))))
