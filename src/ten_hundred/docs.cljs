@@ -1,6 +1,8 @@
 (ns ten-hundred.docs
   (:require [cljs.core.async :refer [chan]]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+
+            [ten-hundred.terms :as terms]))
 
 (def AppState)
 
@@ -30,8 +32,10 @@
         blob (js/Blob. #js [levels-text]
                        #js {:type "text/plain;charset=utf-8"})
 
-        top-definition (first (last (remove empty? levels)))
-        title (if (string/blank? (:term top-definition))
+        top-definition (get-in levels (terms/top-definition-path levels))
+
+        title (if (or (not top-definition)
+                      (string/blank? (:term top-definition)))
                 "Untitled"
                 (:term top-definition))]
     (js/saveAs blob (str title ".10h"))))

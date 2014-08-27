@@ -15,7 +15,7 @@
    :meaning ""})
 
 (defn handle-term-change! [e definition]
-  (om/update! definition :term (string/replace (.. e -target -value) #" " "_")))
+  (om/update! definition :term (terms/escape-term (.. e -target -value))))
 
 (defn handle-focus! [e path control]
   (put! control [:author path]))

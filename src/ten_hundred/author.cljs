@@ -85,7 +85,7 @@
               (dom/input {:class "authorTerm"
                           :type "text" :placeholder "Term"
                           :value (:term definition)
-                          :on-change #(om/update! definition :term (string/replace (.. % -target -value) #" " "_"))})
+                          :on-change #(om/update! definition :term (terms/escape-term (.. % -target -value)))})
 
               (om/build edit/editor-view definition
                         {:state {:terms terms

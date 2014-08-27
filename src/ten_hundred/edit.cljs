@@ -31,8 +31,6 @@
 (defn handle-scroll! [e owner]
   (let [textarea (.-target e)
         bg (om/get-node owner "bg")]
-  (js/console.log "scroll" (.-scrollTop textarea))
-
     (om/set-state! owner :scroll {:top (.-scrollTop textarea)
                                   :width (.-scrollWidth textarea)})))
 
@@ -100,6 +98,8 @@
         (dom/textarea {:class "edit"
                        :ref "edit"
 
+                       :spell-check false
+
                        :scroll-top (:top scroll)
 
                        :placeholder "Define term here."
@@ -107,7 +107,7 @@
 
                        :on-focus (when path #(put! control [:author path]))
 
-                       :on-scroll #(handle-scroll! % owner)
+                       :on-scroll (when highlight #(handle-scroll! % owner))
                        :on-change (when-not read-only #(handle-meaning-change! % owner definition))})
         (when highlight
           (dom/pre {:class "bg"

@@ -131,8 +131,6 @@
 
      :highlight true
 
-     :author-path [0 0]
-
      :dragging nil})
 
   (will-mount [_]
@@ -292,7 +290,8 @@
               (atom {:levels levels
                      :notifications []})
               {:target (js/document.getElementById "container")
-               :init-state {:file file}
+               :init-state {:file file
+                            :author-path (terms/top-definition-path levels)}
 
                :shared {:control (chan)
                         :read-only read-only}})))

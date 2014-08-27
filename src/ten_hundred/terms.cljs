@@ -9,6 +9,20 @@
             [ten-hundred.dict :as dict]
             [ten-hundred.tex :as tex]))
 
+(defn escape-term [term]
+  (string/replace term #"[^A-Za-z0-9_']" "_"))
+
+(defn top-definition-path [levels]
+  (->> levels
+       (map-indexed
+        (fn [level-idx level]
+          (map-indexed
+           (fn [definition-idx definition]
+             [level-idx definition-idx])
+           level)))
+       (apply concat)
+       last))
+
 (defn find-terms [levels]
   (apply concat
     (map-indexed
