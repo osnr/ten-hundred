@@ -9,10 +9,25 @@
 
 (defn render-notification [notification]
   (case (first notification)
+    :saved
+    (dom/div
+      (dom/p
+       "Saved to new link "
+       (dom/strong (dom/a {:href (second notification)} (second notification)))
+       ".")
+      (dom/p
+       "You can bookmark that link to edit this document later."))
+
     :published
-    (dom/span
-      "Published to "
-      (dom/a {:href (second notification)} (second notification)))))
+    (dom/div
+      (dom/p
+       "Published to "
+       (dom/strong (dom/a {:href (second notification)} (second notification)))
+       ".")
+      (dom/p
+       "If you share that link with people, they can view, not change, this document. Save "
+       (dom/a {:href (get notification 2)} "your original link")
+       " to edit this document later:"))))
 
 (defcomponent notifications-view [notifications owner]
   (render [_]

@@ -15,16 +15,18 @@
 
 ;; expansion view
 (declare expand-word)
-(defn expand [control highlight terms expand-to meaning]
-  (terms/word-map (if highlight
-                    #(expand-word control highlight terms expand-to %)
-                    identity)
-                  edit/render-tex
-                  meaning))
+(defn expand [owner control terms expand-to meaning]
+  (let [highlight (om/get-state owner :highlight)]
+    (terms/word-map (if highlight
+                      #(expand-word owner control terms expand-to %)
+                      identity)
+                    edit/render-tex
+                    meaning)))
 
-(defn expand-word [control highlight terms expand-to word]
-  (let [lc-word (string/lower-case word)]
-    (if-let [{[term-level-idx term-definition-idx] :path
+(defn expand-word [owner control terms expand-to word]
+  (let [lc-word (string/lower-case word)
+        hover-path (om/get-state owner :hover-path)]
+    (if-let [{[term-level-idx term-definition-idx :as term-path] :path
               term-meaning :meaning}
              (terms/find-term terms lc-word)]
       (if (>= term-level-idx expand-to)
@@ -35,13 +37,19 @@
           "["
           lc-word
           ": "
-          (conj (vec (expand control highlight terms expand-to term-meaning))
+          (conj (vec (expand owner control terms expand-to term-meaning))
                 "]"))
         (dom/span {:class "defined expandableWord"
+
                    :data-level-idx term-level-idx
                    :data-definition-idx term-definition-idx
+
+                   :on-mouse-enter #(om/set-state! owner :hover-path term-path)
+                   :on-mouse-leave #(om/set-state! owner :hover-path nil)
                    :on-click #(terms/word-click! control (.-target %))}
-          word))
+          word
+          (when (= term-path hover-path)
+            (om/build edit/hover-view term-meaning))))
 
       (if (dict/words lc-word)
         word
@@ -54,67 +62,89 @@
 
 (defcomponent author-view [definition owner]
   (init-state [_]
-    {:read-only false
+    {:minimize-edit false
+     :minimize-view false
 
-     :hover-state nil
+     :hover-path nil
 
      :selection [0 0]})
 
   (will-receive-props [this next-props]
     (let [prev-props (om/get-props owner)]
       (when (not= (:term prev-props) (:term next-props))
-        (om/set-state! owner :hover-state nil)
+        (om/set-state! owner :hover-path nil)
         (om/set-state! owner :expand-to nil))))
 
   (render-state [this {:keys [terms
                               highlight level-idx expand-to
-                              hover-state]}]
+                              minimize-edit minimize-view
+                              hover-path]}]
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)
 
           expand-to (or expand-to level-idx)]
       (dom/div {:class (str "author"
-                            (when read-only " readOnly"))}
+                            (when read-only " readOnly")
+                            (when (or minimize-edit minimize-view) " minimizing"))}
+        (when minimize-edit
+          (dom/button {:class "unminimize unminimizeEdit"
+                       :on-click #(om/set-state! owner :minimize-edit false)}
+                      (dom/i {:class "fa fa-angle-right"})))
+        (when minimize-view
+          (dom/button {:class "unminimize unminimizeView"
+                       :on-click #(om/set-state! owner :minimize-view false)}
+                      (dom/i {:class "fa fa-angle-left"})))
+
         (dom/div {:class "authorContentWrapper"}
           (dom/div {:class "authorContent"}
             ;; edit pane
-            (dom/div {:class "pane editPane"
-                      :style {:display (if read-only
-                                         "none"
-                                         "")}}
-              (dom/input {:class "authorTerm"
-                          :type "text" :placeholder "Term"
-                          :value (:term definition)
-                          :on-change #(om/update! definition :term (terms/escape-term (.. % -target -value)))})
+            (when-not minimize-edit
+              (dom/div {:class "pane editPane"
+                        :style {:display (if read-only
+                                           "none"
+                                           "")}}
+                (dom/input {:class "authorTerm"
+                            :type "text" :placeholder "Term"
+                            :value (:term definition)
+                            :on-change #(om/update! definition :term (terms/escape-term (.. % -target -value)))})
 
-              (om/build edit/editor-view definition
-                        {:state {:terms terms
-                                 :highlight highlight}
-                         :react-key "edit-pane-view"}))
+                (dom/button {:class "minimize minimizeEdit"
+                             :on-click #(om/set-state! owner :minimize-edit true)}
+                            (dom/i {:class "fa fa-angle-left"}))
+
+                (dom/button {:class "authorDelete"
+                             :on-click #(put! control [:delete-definition :author])}
+                            (dom/i {:class "fa fa-times"}))
+
+                (om/build edit/editor-view definition
+                          {:state {:terms terms
+                                   :highlight highlight}
+                           :react-key "edit-pane-view"})))
 
             ;; view pane
-            (dom/div {:class "pane viewPane"}
-              (dom/div {:class "authorTerm"}
-                (:term definition))
+            (when-not minimize-view
+              (dom/div {:class "pane viewPane"}
+                (dom/div {:class "authorTerm"}
+                  (:term definition))
 
-              (dom/div {:class "meaning"}
-                (dom/div {:class "edit"
-                          :key "view-pane-content"}
-                  (expand control highlight terms expand-to (:meaning definition))))
+                (dom/button {:class "minimize minimizeView"
+                             :on-click #(om/set-state! owner :minimize-view true)}
+                            (dom/i {:class "fa fa-angle-right"}))
 
-              (dom/div {:class (str "expandControls"
-                                    (when (= level-idx 0)
-                                      " disabled"))}
-                (dom/i {:class "fa fa-plus-square"})
-                (dom/input {:class "expandSlider"
-                            :type "range"
-                            :disabled (= level-idx 0)
-                            :min 0
-                            :max level-idx
-                            :value (or expand-to level-idx)
-                            :on-change #(handle-expand-to-change! % owner)})
-                (dom/i {:class "fa fa-minus-square"})))
+                (dom/div {:class "meaning"}
+                  (dom/div {:class "edit"
+                            :key "view-pane-content"}
+                    (expand owner control terms expand-to (:meaning definition))))
 
-            (when hover-state
-              (om/build edit/hover-view definition
-                        {:state hover-state}))))))))
+                (dom/div {:class (str "expandControls"
+                                      (when (= level-idx 0)
+                                        " disabled"))}
+                  (dom/i {:class "fa fa-plus-square"})
+                  (dom/input {:class "expandSlider"
+                              :type "range"
+                              :disabled (= level-idx 0)
+                              :min 0
+                              :max level-idx
+                              :value (or expand-to level-idx)
+                              :on-change #(handle-expand-to-change! % owner)})
+                  (dom/i {:class "fa fa-minus-square"}))))))))))

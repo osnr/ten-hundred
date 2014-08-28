@@ -6,26 +6,48 @@
 
 (def AppState)
 
-(defn open-disk! []
-  )
+(defn base-location []
+  (aget (.match js/window.location.href #"(^[^\?]*)") 1))
 
 (defn definition->text [{:keys [term meaning]}]
   (str ":: " term "\n"
        meaning))
 
 (defn level->text [idx level]
-  (str ": Level " idx "\n"
+  (str ": Level_" idx "\n"
        (string/join "\n\n" (map definition->text level))))
 
 (defn levels->text [levels]
   (string/join "\n\n" (map-indexed level->text levels)))
 
+(defn level-chunks->level [chunks]
+  (->> chunks
+       (partition 2)
+       (map (fn [[[term-line] meaning-lines]]
+              {:term (.substring term-line 3)
+               :meaning
+               (->> meaning-lines
+                    (reverse) ;; TODO why not rseq?
+                    (drop-while string/blank?)
+                    (reverse)
+                    (string/join "\n"))}))
+       (vec)))
+
 (defn text->levels [text]
-  )
-
-(defn text->level [text])
-
-(defn text->definition [text])
+  (->> text
+       (string/split-lines)
+       (partition-by
+        #(cond
+          (= (.substring % 0 2) ": ") :level
+          (= (.substring % 0 3) ":: ") :definition
+          :else nil))
+       (partition-by
+        #(= (.substring (first %) 0 2)
+            ": "))
+       (rest)
+       (take-nth 2) ;; throw away Level_n labels
+       (map level-chunks->level)
+       (vec)))
 
 (defn save-disk! [levels]
   (let [levels-text (levels->text levels)
@@ -39,6 +61,14 @@
                 "Untitled"
                 (:term top-definition))]
     (js/saveAs blob (str title ".10h"))))
+
+(defn open-disk! [files handler]
+  (doseq [file files]
+    (let [file-reader (js/FileReader.)]
+      (set! (.-onload file-reader)
+            #(handler (text->levels (.-result file-reader))))
+
+      (.readAsText file-reader file))))
 
 (defn id [app-state]
   (.-id app-state))
@@ -71,8 +101,8 @@
      #js {:success
           (fn [response]
             (let [publish-id (.-publishId response)
-                  base-location (aget (.match js/window.location.href "(^[^#]*)") 1)]
-              (handler (str base-location "#/view/" publish-id))))
+                  base-location (base-location)]
+              (handler (str base-location "?/view/" publish-id))))
 
           :error
           (fn [error]

@@ -6,8 +6,8 @@
             [cljs.core.async :refer [put!]]
 
             [clojure.string :as string]
-            [goog.dom]
             [goog.dom.classlist :as classlist]
+            [goog.dom.selection :as selection]
 
             [ten-hundred.tex :as tex]
             [ten-hundred.terms :as terms]))
@@ -28,14 +28,43 @@
     (dom/div {:class "hover"}
       content)))
 
-(defn handle-scroll! [e owner]
-  (let [textarea (.-target e)
-        bg (om/get-node owner "bg")]
-    (om/set-state! owner :scroll {:top (.-scrollTop textarea)
-                                  :width (.-scrollWidth textarea)})))
+(defn handle-meaning-key-press! [e owner definition] 
+  (when (= 36 (.-charCode e)) ;; keypress = $
+    (let [textarea (om/get-node owner "edit")
+          [start end] (selection/getEndPoints textarea)
+
+          meaning (:meaning @definition)]
+      (when (and (= start end)
+                 (re-matches #"[^\$]?\$" (.substr meaning (- end 2) 2)))
+        (om/update! definition :meaning
+                    (str (.substr meaning 0 end)
+                         "$$$"
+                         (.substr meaning end)))
+        (js/setTimeout #(selection/setCursorPosition textarea (+ end 1)) 0)
+        false))))
 
 (defn handle-meaning-change! [e owner definition]
   (om/update! definition :meaning (.-value (.-target e))))
+
+(defn handle-scroll! [e owner]
+  (let [textarea (om/get-node owner "edit")
+        bg (om/get-node owner "bg")]
+    (set! (.-scrollTop bg) (.-scrollTop textarea))
+    (when-not (= (.-scrollWidth bg) (.-scrollWidth textarea))
+      (set! (.-maxWidth (.-style bg)) (.-scrollWidth textarea)))
+
+    (when e
+      (if-not (aget owner "scrollTimer")
+        (classlist/add bg "scrolling")
+        (do (js/clearTimeout (.-scrollTimer owner))
+            (set! (.-scrollTimer owner) nil)))
+      (set! (.-scrollTimer owner)
+            (js/setTimeout
+             (fn [_]
+               (println "stop")
+               (classlist/remove bg "scrolling")
+               (set! (.-scrollTimer owner) nil))
+             250)))))
 
 (defn handle-mousemove! [e owner definition terms]
   (let [target (.-target e)
@@ -82,15 +111,16 @@
 (defcomponent editor-view [definition owner]
   (init-state [this]
     {:hover-idx nil ; TODO this should use... mixins or something?
+     })
 
-     :scroll {:top 0
-              :width nil}})
+  (did-update [_ _ _]
+    (handle-scroll! nil owner))
 
   (render-state [this {:keys [terms
                               highlight
                               path
-                              hover-idx
-                              scroll]}]
+                              hover-idx]}]
+    (println "rerender")
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)]
       (dom/div {:class "meaning"
@@ -100,21 +130,17 @@
 
                        :spell-check false
 
-                       :scroll-top (:top scroll)
-
                        :placeholder "Define term here."
                        :value (:meaning definition)
 
                        :on-focus (when path #(put! control [:author path]))
+                       :on-scroll #(handle-scroll! % owner)
 
-                       :on-scroll (when highlight #(handle-scroll! % owner))
-                       :on-change (when-not read-only #(handle-meaning-change! % owner definition))})
+                       :on-change (when-not read-only #(handle-meaning-change! % owner definition))
+                       :on-key-press (when-not read-only #(handle-meaning-key-press! % owner definition))})
         (when highlight
           (dom/pre {:class "bg"
                     :ref "bg"
-
-                    :scroll-top (:top scroll)
-                    :style {:max-width (:width scroll)}
 
                     :on-click #(terms/word-click! control (.-target %))}
             (terms/word-map #(colorize-word terms hover-idx %1 %2)

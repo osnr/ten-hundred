@@ -104,23 +104,34 @@
                                       (assoc (definition/empty-definition)
                                         :term term)))))))
 
-(defn save! [owner file levels]
-  (docs/save! file levels
-              (fn [file]
-                (js/window.history.replaceState "" "" (str "#/" (docs/id file)))
-                (om/set-state! owner :file file))
-
-              (fn [error]
-                (js/alert error))))
+(defn open-disk! [levels files]
+  (docs/open-disk!
+   files
+   (fn [new-levels]
+     (om/transact! levels #(into new-levels %)))))
 
 (defn notify! [notifications notification]
   (om/transact! notifications #(conj % notification)))
+
+(defn save! [owner notifications file levels]
+  (docs/save! file levels
+              (fn [new-file]
+                (let [suffix (str "?/" (docs/id new-file))]
+                  (js/window.history.replaceState "" "" suffix)
+                  (when-not file
+                    (notify! notifications
+                             [:saved (str (docs/base-location) suffix)]))
+                  (om/set-state! owner :file new-file)))
+
+              (fn [error]
+                (js/alert error))))
 
 (defn publish! [notifications file levels]
   (docs/publish! file levels
                  (fn [publish-url]
                    (notify! notifications
-                            [:published publish-url]))
+                            [:published publish-url
+                             (str (docs/base-location) "?/" (docs/id file))]))
 
                  (fn [error]
                    (js/alert error))))
@@ -171,6 +182,11 @@
           (delete-at! levels owner
                       :level level-idx)
 
+          [:delete-definition :author]
+          (delete-at! levels owner
+                      :definition
+                      (om/get-state owner :author-path))
+
           [:delete-definition path]
           (delete-at! levels owner
                       :definition path))
@@ -209,25 +225,32 @@
                          :on-change #(om/set-state! owner :highlight (.-checked (.-target %)))})
              "Highlight terms")
 
-            (if read-only
-              [(dom/button {:on-click #(docs/open-disk!)}
-                           "Import file as new"
-                           (dom/i {:class "fa fa-folder-open"}))
-               (dom/button {:on-click #(docs/save-disk! @levels)}
-                           "Export file"
-                           (dom/i {:class "fa fa-floppy-o"}))
-               (dom/button {:on-click #(save! owner file @levels)}
-                           "Save as new URL"
-                           (dom/i {:class "fa fa-cloud-upload"}))]
+            (dom/button {:on-click #(js/window.open (docs/base-location))}
+                        "New"
+                        (dom/i {:class "fa fa-file"}))
 
-              [(dom/button {:on-click #(docs/open-disk!)}
-                           "Import file"
+            (if read-only
+              [(dom/button {:on-click #(docs/save-disk! @levels)}
+                           "Export file"
+                           (dom/i {:class "fa fa-floppy-o"}))
+               (dom/button {:on-click #(save! owner notifications file @levels)}
+                           "Save to new link"
+                           (dom/i {:class "fa fa-code-fork"}))]
+
+              [(dom/input {:type "file"
+                           :ref "fileChooser"
+                           :style {:display "none"}
+                           :multiple true
+                           :on-change #(open-disk! levels (prim-seq (.-files (.-target %))))})
+
+               (dom/button {:on-click #(.click (om/get-node owner "fileChooser"))}
+                           "Import file here"
                            (dom/i {:class "fa fa-folder-open"}))
                (dom/button {:on-click #(docs/save-disk! @levels)}
                            "Export file"
                            (dom/i {:class "fa fa-floppy-o"}))
-               (dom/button {:on-click #(save! owner file @levels)}
-                           "Save to URL"
+               (dom/button {:on-click #(save! owner notifications file @levels)}
+                           "Save to Web"
                            (dom/i {:class "fa fa-cloud-upload"}))
                (dom/button {:on-click #(publish! notifications file @levels)}
                            "Publish"
@@ -283,7 +306,7 @@
      (when-not read-only
        (js/window.history.replaceState "" ""
                                        (if file
-                                         (str "#/" (docs/id file))
+                                         (str "?/" (docs/id file))
                                          "")))
      (js/console.log (pr-str levels))
      (om/root app-view
@@ -298,7 +321,7 @@
 
 (defn init []
   (docs/init!)
-  (let [id (second (string/split (.-URL js/document) #"#/"))]
+  (let [id (.substring js/window.location.search 2)]
     (cond (empty? id)
           (init-root)
 

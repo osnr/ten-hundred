@@ -10,7 +10,7 @@ token
   / s:spacing { return ["spacing", s] }
 
 tex
-  = "$$" chars:texChar+ "$$" { return chars.join(""); }
+  = "$$" chars:texChar* "$$" { return chars.join(""); }
 
 texChar
   = !"$$" char:. { return char; }
