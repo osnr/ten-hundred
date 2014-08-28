@@ -38,7 +38,7 @@
 (defn find-term [terms token]
   (last (filter #(= (:term %) token) terms)))
 
-(defn colorize-word [terms word idx]
+(defn colorize-word [self-term highlight terms word idx]
   (let [lc-word (string/lower-case word)
         term-state (when terms (find-term terms lc-word))]
     (cond term-state
@@ -51,9 +51,17 @@
                        :data-idx idx}
                       word))
 
-          (dict/words lc-word) word
+          (= (string/lower-case self-term) lc-word)
+          (dom/span {:class "self"} word)
 
-          :else (dom/span {:class "notDefined"} word))))
+          (dict/words lc-word)
+          word
+
+          highlight
+          (dom/span {:class "notDefined"} word)
+
+          :else
+          word)))
 
 (defn word-map [word-f tex-f text]
   (->> text

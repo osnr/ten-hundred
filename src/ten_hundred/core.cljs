@@ -223,7 +223,7 @@
              (dom/input {:type "checkbox"
                          :checked highlight
                          :on-change #(om/set-state! owner :highlight (.-checked (.-target %)))})
-             "Highlight terms")
+             "Flag unknown words")
 
             (dom/button {:on-click #(js/window.open (docs/base-location))}
                         "New"
@@ -296,7 +296,8 @@
                           :definition definition/definition-view
                           :level level/level-view)
                         (:data dragging)
-                        {:state {:drag-clone {:pos [(- mouse-x offset-x)
+                        {:react-key "drag-preview"
+                         :state {:drag-clone {:pos [(- mouse-x offset-x)
                                                     (- mouse-y offset-y)]}}}))))))))
 
 (defn init-root

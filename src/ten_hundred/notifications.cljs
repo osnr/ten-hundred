@@ -27,7 +27,7 @@
       (dom/p
        "If you share that link with people, they can view, not change, this document. Save "
        (dom/a {:href (get notification 2)} "your original link")
-       " to edit this document later:"))))
+       " to edit this document later."))))
 
 (defcomponent notifications-view [notifications owner]
   (render [_]

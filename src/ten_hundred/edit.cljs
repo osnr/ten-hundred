@@ -25,7 +25,7 @@
 
 (defcomponent tex-hover-view [content owner]
   (render [this]
-    (dom/div {:class "hover"}
+    (dom/div {:class "hover texHover"}
       content)))
 
 (defn handle-meaning-key-press! [e owner definition] 
@@ -35,7 +35,8 @@
 
           meaning (:meaning @definition)]
       (when (and (= start end)
-                 (re-matches #"[^\$]?\$" (.substr meaning (- end 2) 2)))
+                 (re-matches #"[^\$]?\$" (.substr meaning (- end 2) 2))
+                 (not (= "$$" (.substr meaning end 2))))
         (om/update! definition :meaning
                     (str (.substr meaning 0 end)
                          "$$$"
@@ -47,24 +48,28 @@
   (om/update! definition :meaning (.-value (.-target e))))
 
 (defn handle-scroll! [e owner]
-  (let [textarea (om/get-node owner "edit")
-        bg (om/get-node owner "bg")]
-    (set! (.-scrollTop bg) (.-scrollTop textarea))
-    (when-not (= (.-scrollWidth bg) (.-scrollWidth textarea))
-      (set! (.-maxWidth (.-style bg)) (.-scrollWidth textarea)))
+  (try
+    (let [textarea (om/get-node owner "edit")
+          bg (om/get-node owner "bg")]
+      (set! (.-scrollTop bg) (.-scrollTop textarea))
+      (when-not (= (.-scrollWidth bg) (.-scrollWidth textarea))
+        (set! (.-maxWidth (.-style bg)) (.-scrollWidth textarea)))
 
-    (when e
-      (if-not (aget owner "scrollTimer")
-        (classlist/add bg "scrolling")
-        (do (js/clearTimeout (.-scrollTimer owner))
-            (set! (.-scrollTimer owner) nil)))
-      (set! (.-scrollTimer owner)
-            (js/setTimeout
-             (fn [_]
-               (println "stop")
-               (classlist/remove bg "scrolling")
-               (set! (.-scrollTimer owner) nil))
-             250)))))
+      (when e
+        (if-not (aget owner "scrollTimer")
+          (classlist/add bg "scrolling")
+          (do (js/clearTimeout (.-scrollTimer owner))
+              (set! (.-scrollTimer owner) nil)))
+        (set! (.-scrollTimer owner)
+              (js/setTimeout
+               (fn [_]
+                 (println "stop")
+                 (classlist/remove bg "scrolling")
+                 (set! (.-scrollTimer owner) nil))
+               250))))
+    (catch js/Object e
+      nil ; in case there is no bg
+      )))
 
 (defn handle-mousemove! [e owner definition terms]
   (let [target (.-target e)
@@ -90,20 +95,19 @@
         (:tex data)
         (dom/span {:class "delimiter"} "$$"))
 
-      ;; (om/build hover-view
-      ;;           (om/build tex/tex
-      ;;                     {:style {}
-      ;;                      :text (:tex data)})
-      ;;           {:react-key (str "hover-" (:idx data))})
-      )))
+      (om/build tex-hover-view
+                (om/build tex/tex
+                          {:style {}
+                           :text (:tex data)})
+                {:react-key (str "hover-" (:idx data))}))))
 
 (defn colorize-tex [tex idx]
   (om/build tex-span-view {:tex tex
                            :idx idx}))
 
-(defn colorize-word [terms hover-idx word idx]
+(defn colorize-word [self-term highlight terms hover-idx word idx]
   (dom/span {:style {:position "relative"}}
-    (terms/colorize-word terms word idx)
+    (terms/colorize-word self-term highlight terms word idx)
     (when (= hover-idx idx)
       (om/build hover-view
                 (:meaning (terms/find-term terms (string/lower-case word)))))))
@@ -120,7 +124,6 @@
                               highlight
                               path
                               hover-idx]}]
-    (println "rerender")
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)]
       (dom/div {:class "meaning"
@@ -138,11 +141,10 @@
 
                        :on-change (when-not read-only #(handle-meaning-change! % owner definition))
                        :on-key-press (when-not read-only #(handle-meaning-key-press! % owner definition))})
-        (when highlight
-          (dom/pre {:class "bg"
-                    :ref "bg"
+        (dom/pre {:class "bg"
+                  :ref "bg"
 
-                    :on-click #(terms/word-click! control (.-target %))}
-            (terms/word-map #(colorize-word terms hover-idx %1 %2)
-                            colorize-tex
-                            (:meaning definition))))))))
+                  :on-click #(terms/word-click! control (.-target %))}
+          (terms/word-map #(colorize-word (:term definition) highlight terms hover-idx %1 %2)
+                          colorize-tex
+                          (:meaning definition)))))))
