@@ -11,18 +11,19 @@
             [ten-hundred.terms :as terms]
             [ten-hundred.dict :as dict]
             [ten-hundred.tex :as tex]
-            [ten-hundred.edit :as edit]))
+            [ten-hundred.edit :as edit]
+            [ten-hundred.hover :as hover]))
 
 ;; expansion view
 (declare expand-word)
 (defn expand [owner control terms highlight expand-to meaning]
-  (terms/word-map #(expand-word owner control terms highlight expand-to %)
-                  edit/render-tex
+  (terms/word-map {:word #(expand-word owner control terms highlight expand-to %)
+                   :image identity
+                   :tex #(om/build tex/tex {:text %})}
                   meaning))
 
 (defn expand-word [owner control terms highlight expand-to word]
-  (let [lc-word (string/lower-case word)
-        hover-path (om/get-state owner :hover-path)]
+  (let [lc-word (string/lower-case word)]
     (if-let [{[term-level-idx term-definition-idx :as term-path] :path
               term-meaning :meaning}
              (terms/find-term terms lc-word)]
@@ -41,12 +42,12 @@
                    :data-level-idx term-level-idx
                    :data-definition-idx term-definition-idx
 
-                   :on-mouse-enter #(om/set-state! owner :hover-path term-path)
-                   :on-mouse-leave #(om/set-state! owner :hover-path nil)
                    :on-click #(terms/word-click! control (.-target %))}
-          word
-          (when (= term-path hover-path)
-            (om/build edit/hover-view term-meaning))))
+          (om/build hover/span-with-hover-view
+                    {:content word
+                     ;; FIXME code duplication w/ colorize-word
+                     :hover-style {:width (min 400 (+ 20 (* 7 (count term-meaning))))}
+                     :hover-content term-meaning})))
 
       (cond (dict/words lc-word) word
 
@@ -64,22 +65,16 @@
 (defcomponent author-view [definition owner]
   (init-state [_]
     {:minimize-edit false
-     :minimize-view true
-
-     :hover-path nil
-
-     :selection [0 0]})
+     :minimize-view true})
 
   (will-receive-props [this next-props]
     (let [prev-props (om/get-props owner)]
       (when (not= (:term prev-props) (:term next-props))
-        (om/set-state! owner :hover-path nil)
         (om/set-state! owner :expand-to nil))))
 
   (render-state [this {:keys [terms
                               highlight level-idx expand-to
-                              minimize-edit minimize-view
-                              hover-path]}]
+                              minimize-edit minimize-view]}]
     (let [read-only (om/get-shared owner :read-only)
           control (om/get-shared owner :control)
 

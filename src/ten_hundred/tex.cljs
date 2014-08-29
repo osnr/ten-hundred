@@ -57,6 +57,7 @@
   (did-mount [_]
     (let [text (:text props)
           on-render (:on-render props)]
+      (js/console.log text)
       (set-script-text! owner text)
       (process (.-script owner) on-render)))
 
