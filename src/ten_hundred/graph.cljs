@@ -10,9 +10,10 @@
 (defn deps [terms level-idx meaning]
   (->> meaning
        (js/THParser.parse)
-       (filter #(= (first %) "word"))
-       (map (fn [[_ word]]
-              (let [lc-word (string/lower-case word)]
+       (filter #(= (.-kind %) "word"))
+       (map (fn [token]
+              (let [word (.-data token)
+                    lc-word (string/lower-case word)]
                 (first (filter #(and (< (first (:path %)) level-idx)
                                      (= (:term %) lc-word))
                                terms)))))

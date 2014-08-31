@@ -13,10 +13,6 @@
             [ten-hundred.terms :as terms]
             [ten-hundred.hover :as hover]))
 
-(defn render-tex [tex]
-  (om/build tex/tex {:style {}
-                     :text tex}))
-
 (defn handle-meaning-key-press! [e owner definition] 
   (when (= 36 (.-charCode e)) ;; keypress = $
     (let [textarea (om/get-node owner "edit")
@@ -76,9 +72,9 @@
                    (dom/span {:class "delimiter"} "$$"))
 
                  :hover-content
-                 (om/build tex/tex
-                           {:style {}
-                            :text (:tex data)})}))))
+                 #(om/build tex/tex
+                            {:style {}
+                             :text (:tex data)})}))))
 
 (defn colorize-tex [tex idx]
   (om/build tex-span-view {:tex tex

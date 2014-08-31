@@ -57,7 +57,6 @@
   (did-mount [_]
     (let [text (:text props)
           on-render (:on-render props)]
-      (js/console.log text)
       (set-script-text! owner text)
       (process (.-script owner) on-render)))
 
@@ -81,4 +80,5 @@
     (let [script (.-script owner)]
       (when (and script (aget js/window "MathJax"))
         (when-let [jax (js/MathJax.Hub.getJaxFor script)]
-          (.Remove jax))))))
+          (.Remove jax))
+        (set! (.-script owner) nil)))))

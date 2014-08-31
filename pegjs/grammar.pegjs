@@ -5,10 +5,10 @@ meaning
   = tokens:token*
 
 token
-  = t:tex { return ["tex", t]; }
-  / i:image { return ["image", i]; }
-  / w:word { return ["word", w]; }
-  / s:spacing { return ["spacing", s]; }
+  = t:tex { return { kind: "tex", data: t }; }
+  / i:image { return { kind: "image", data: i }; }
+  / w:word { return { kind: "word", data: w }; }
+  / s:spacing { return { kind: "spacing", data: s }; }
 
 tex
   = "$$" chars:texChar* "$$" { return chars.join(""); }

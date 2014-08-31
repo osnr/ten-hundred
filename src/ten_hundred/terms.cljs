@@ -24,6 +24,10 @@
        (apply concat)
        last))
 
+(defn render-tex [tex]
+  (om/build tex/tex {:style {}
+                     :text tex}))
+
 (defn find-terms [levels]
   (apply concat
     (map-indexed
@@ -58,7 +62,10 @@
                        {:width (min 400 (+ 20 (* 7 (count (:meaning term-state)))))}
 
                        :hover-content
-                       (:meaning term-state)}))
+                       #(word-map {:word identity
+                                   :image identity
+                                   :tex render-tex}
+                                  (:meaning term-state))}))
 
           (= (string/lower-case self-term) lc-word)
           (dom/span {:class "self"} word)
@@ -75,12 +82,14 @@
 (defn word-map [{:keys [word image tex]} text]
   (->> text
        (js/THParser.parse)
-       (map-indexed (fn [idx [kind text]]
-                      (case kind
-                        "spacing" text
-                        "tex" (tex text idx)
-                        "image" (image (.-alt text) (.-src text) idx)
-                        "word" (word text idx))))))
+       (map-indexed (fn [idx token]
+                      (let [kind (.-kind token)
+                            data (.-data token)]
+                        (case kind
+                          "spacing" data
+                          "tex" (tex data idx)
+                          "image" (image (.-alt data) (.-src data) idx)
+                          "word" (word data idx)))))))
 
 (defn word-click! [control target]
   (cond (classlist/contains target "notDefined") ; not defined term

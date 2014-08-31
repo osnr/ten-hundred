@@ -497,8 +497,6 @@ body {
   }
 }
 
-
-
 .hover {
   font-family: $definition-font;
   font-size: 13px;
@@ -555,6 +553,10 @@ body {
 .math {
   border: 1px solid rgba(0, 255, 0, 0.1);
   margin: -1px;
+  pointer-events: auto;
+}
+.hovering > .math {
+  pointer-events: none;
 }
 
 .texTooltip {
