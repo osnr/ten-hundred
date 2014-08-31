@@ -13,6 +13,12 @@
 (defn escape-term [term]
   (string/replace term #"[^A-Za-z0-9_']" "_"))
 
+(defn get-synonyms [input]
+  (-> input
+      (string/replace #"[^A-Za-z0-9_' ]" "_")
+      (string/split #" ")
+      (#(remove string/blank? %))))
+
 (defn top-definition-path [levels]
   (->> levels
        (map-indexed
@@ -33,15 +39,19 @@
     (map-indexed
      (fn [level-idx level]
        (->> level
-            (map-indexed (fn [definition-idx {:keys [term meaning]}]
+            (map-indexed (fn [definition-idx {:keys [term synonyms meaning]}]
                            (hash-map :term (string/lower-case term)
+                                     :synonyms (map string/lower-case synonyms)
                                      :meaning meaning
                                      :path [level-idx definition-idx])))
-            (remove #(empty? (:term %)))))
+            (remove #(and (string/blank? (:term %))
+                          (empty? (:synonyms %))))))
      levels)))
 
 (defn find-term [terms token]
-  (last (filter #(= (:term %) token) terms)))
+  (last (filter #(or (= (:term %) token)
+                     (some #{token} (:synonyms %)))
+                terms)))
 
 (defn colorize-word [self-term highlight terms word idx]
   (let [lc-word (string/lower-case word)

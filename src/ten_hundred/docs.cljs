@@ -9,8 +9,8 @@
 (defn base-location []
   (aget (.match js/window.location.href #"(^[^\?]*)") 1))
 
-(defn definition->text [{:keys [term meaning]}]
-  (str ":: " term "\n"
+(defn definition->text [{:keys [term synonyms meaning]}]
+  (str ":: " term " " (string/join " " synonyms) "\n"
        meaning))
 
 (defn level->text [idx level]
@@ -24,13 +24,15 @@
   (->> chunks
        (partition 2)
        (map (fn [[[term-line] meaning-lines]]
-              {:term (.substring term-line 3)
-               :meaning
-               (->> meaning-lines
-                    (reverse) ;; TODO why not rseq?
-                    (drop-while string/blank?)
-                    (reverse)
-                    (string/join "\n"))}))
+              (let [terms (string/split (.substring term-line 3) #" ")]
+                {:term (or (first terms) "")
+                 :synonyms (or (rest terms) [])
+                 :meaning
+                 (->> meaning-lines
+                      (reverse) ;; TODO why not rseq?
+                      (drop-while string/blank?)
+                      (reverse)
+                      (string/join "\n"))})))
        (vec)))
 
 (defn text->levels [text]

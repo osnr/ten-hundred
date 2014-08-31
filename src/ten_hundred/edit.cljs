@@ -80,6 +80,22 @@
   (om/build tex-span-view {:tex tex
                            :idx idx}))
 
+(defn colorize-image [alt src]
+  (dom/span
+    (om/build hover/span-with-hover-view
+              {:content
+               (dom/span {:class "imageTag"}
+                 "!["
+                 alt
+                 "]("
+                 src
+                 ")")
+
+               :hover-content
+               (dom/img {:class "embedImage"
+                         :alt alt
+                         :src src})})))
+
 (defcomponent editor-view [definition owner]
   (did-update [_ _ _]
     (handle-scroll! nil owner))
@@ -108,6 +124,6 @@
 
                   :on-click #(terms/word-click! control (.-target %))}
           (terms/word-map {:word #(terms/colorize-word (:term definition) highlight terms %1 %2)
-                           :image identity
+                           :image colorize-image
                            :tex colorize-tex}
                           (:meaning definition)))))))

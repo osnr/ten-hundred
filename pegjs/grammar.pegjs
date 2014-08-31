@@ -23,4 +23,7 @@ word
   = chars:[A-Za-z0-9_'$]+ { return chars.join(""); }
 
 spacing
-  = spaces:[^A-Za-z0-9_'$]+ { return spaces.join(""); }
+  = spaces:space+ { return spaces.join(""); }
+
+space
+  = !image char:[^A-Za-z0-9_'$] { return char; }

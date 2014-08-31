@@ -18,7 +18,7 @@
 (declare expand-word)
 (defn expand [owner control terms highlight expand-to meaning]
   (terms/word-map {:word #(expand-word owner control terms highlight expand-to %)
-                   :image identity
+                   :image #(dom/img {:class "embedImage" :alt %1 :src %2})
                    :tex #(om/build tex/tex {:text %})}
                   meaning))
 
@@ -103,6 +103,18 @@
                             :type "text" :placeholder "Term"
                             :value (:term definition)
                             :on-change #(om/update! definition :term (terms/escape-term (.. % -target -value)))})
+
+                (dom/input {:class "authorSynonyms"
+                            :type "text"
+                            :ref "synonyms"
+
+                            :on-mouse-enter #(set! (.-placeholder (om/get-node owner "synonyms"))
+                                                   "synonym_1 synonym_2 ...")
+                            :on-mouse-leave #(set! (.-placeholder (om/get-node owner "synonyms")) "")
+
+                            :value (string/join " " (:synonyms definition))
+                            :on-change #(om/update! definition :synonyms
+                                                    (terms/get-synonyms (.. % -target -value)))})
 
                 (dom/button {:class "minimize minimizeEdit"
                              :on-click #(om/set-state! owner :minimize-edit true)}

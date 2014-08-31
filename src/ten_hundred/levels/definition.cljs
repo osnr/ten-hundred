@@ -12,6 +12,7 @@
 
 (defn empty-definition []
   {:term ""
+   :synonyms []
    :meaning ""})
 
 (defn handle-term-change! [e definition]
@@ -46,6 +47,21 @@
                       :on-change (when-not read-only
                                    #(handle-term-change! % definition))
                       :on-focus #(handle-focus! % path control)})
+
+          (dom/input {:class "synonyms"
+                      :type "text"
+                      :ref "synonyms"
+
+                      :on-mouse-enter #(set! (.-placeholder (om/get-node owner "synonyms"))
+                                             "synonym_1 synonym_2 ...")
+                      :on-mouse-leave #(set! (.-placeholder (om/get-node owner "synonyms")) "")
+
+                      :value (string/join " " (:synonyms definition))
+                      :on-change
+                      (when-not read-only
+                        #(om/update! definition :synonyms
+                                     (terms/get-synonyms (.. % -target -value))))})
+
           (when-not read-only
             (dom/button {:class "remove"
                          :on-click #(put! control [:delete-definition path])}
