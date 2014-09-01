@@ -8,6 +8,7 @@
             [cljs.core.async :refer [put! chan <!]]
             [cljs.core.match]
             [clojure.string :as string]
+
             [ten-hundred.util :refer [splice insert]]
             [ten-hundred.graph :as graph]
             [ten-hundred.notifications :as notifications]
@@ -114,6 +115,7 @@
   (om/transact! notifications #(conj % notification)))
 
 (defn save! [owner notifications file levels]
+  (om/set-state! owner :dirty false)
   (docs/save! file levels
               (fn [new-file]
                 (let [suffix (str "?/" (docs/id new-file))]
@@ -138,11 +140,17 @@
 
 (defcomponent app-view [app owner]
   (init-state [_]
-    {:mode :author
+    {:dirty false
+
+     :mode :author
 
      :highlight true
 
      :dragging nil})
+
+  (will-receive-props [this next-props]
+    (when-not (= (:levels next-props) (:levels (om/get-props owner)))
+      (om/set-state! owner :dirty true)))
 
   (will-mount [_]
     (let [control (om/get-shared owner :control)
@@ -298,7 +306,20 @@
                         (:data dragging)
                         {:react-key "drag-preview"
                          :state {:drag-clone {:pos [(- mouse-x offset-x)
-                                                    (- mouse-y offset-y)]}}}))))))))
+                                                    (- mouse-y offset-y)]}}})))))))
+
+  (did-update [_ _ _]
+    (set! (.-title js/document)
+          (str (when (om/get-state owner :dirty)
+                 "(unsaved) ")
+               (:term (get-in (:levels app) (om/get-state owner :author-path)))
+               " – ten-hundred"))
+    (set! (.-onbeforeunload js/window)
+          (if (om/get-state owner :dirty)
+            (fn []
+              (str "You haven't saved your document to an online link. "
+                   "If you close this window, you might lose your data."))
+            nil))))
 
 (defn init-root
   ([]
