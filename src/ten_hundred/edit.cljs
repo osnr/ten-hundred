@@ -48,7 +48,6 @@
         (set! (.-scrollTimer owner)
               (js/setTimeout
                (fn [_]
-                 (println "stop")
                  (classlist/remove bg "scrolling")
                  (set! (.-scrollTimer owner) nil))
                250))))

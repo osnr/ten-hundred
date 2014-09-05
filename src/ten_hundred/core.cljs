@@ -144,7 +144,7 @@
 
      :mode :author
 
-     :highlight true
+     :highlight false
 
      :dragging nil})
 
