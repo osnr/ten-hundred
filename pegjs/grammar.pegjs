@@ -6,6 +6,7 @@ meaning
 
 token
   = t:tex { return { kind: "tex", data: t }; }
+  / l:link { return { kind: "link", data: l }; }
   / i:image { return { kind: "image", data: i }; }
   / w:word { return { kind: "word", data: w }; }
   / s:spacing { return { kind: "spacing", data: s }; }
@@ -15,6 +16,9 @@ tex
 
 texChar
   = !"$$" char:. { return char; }
+
+link
+  = "![" text:($ [^\]]*) "](" href:($ [^)]*) ")" { return { text: text, href: href }; }
 
 image
   = "![" alt:($ [^\]]*) "](" src:($ [^)]*) ")" { return { alt: alt, src: src }; }
