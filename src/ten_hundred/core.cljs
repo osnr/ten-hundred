@@ -317,7 +317,7 @@
     (set! (.-onbeforeunload js/window)
           (if (om/get-state owner :dirty)
             (fn []
-              (str "You haven't saved your document to an online link. "
+              (str "You haven't saved your ten-hundred document to an online link. "
                    "If you close this window, you might lose your data."))
             nil))))
 
