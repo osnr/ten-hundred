@@ -1,10 +1,9 @@
 (ns ten-hundred.notifications
-  (:require-macros [cljs.core.match.macros :refer [match]])
   (:require [om.core :as om :include-macros true]
             [om-tools.core :refer-macros [defcomponent]]
             [om-tools.dom :as dom :include-macros true]
 
-            [cljs.core.match]
+            [cljs.core.match :refer-macros [match]]
             [ten-hundred.util :refer [splice]]))
 
 (defn render-notification [notification]

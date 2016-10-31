@@ -1,12 +1,11 @@
 (ns ten-hundred.core
-  (:require-macros [cljs.core.async.macros :refer [go go-loop]]
-                   [cljs.core.match.macros :refer [match]])
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [om.core :as om :include-macros true]
             [om-tools.core :refer-macros [defcomponent]]
             [om-tools.dom :as dom :include-macros true]
 
             [cljs.core.async :refer [put! chan <!]]
-            [cljs.core.match]
+            [cljs.core.match :refer-macros [match]]
             [clojure.string :as string]
 
             [ten-hundred.util :refer [splice insert]]
@@ -144,7 +143,7 @@
 
      :mode :author
 
-     :highlight false
+     :highlight true
 
      :dragging nil})
 
